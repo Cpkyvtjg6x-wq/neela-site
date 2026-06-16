@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Flame, PhoneOutgoing, CalendarClock, Users, Plus } from "lucide-react";
 import { getAllProspects, getAllCalls, getAppointments, indexProspects } from "@/lib/crmData";
-import { STATUTS, statutLabel } from "@/lib/crm";
+import { STATUTS, statutLabel, regionForDept } from "@/lib/crm";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +49,14 @@ export default async function Dashboard() {
     ...STATUTS.map((s) => prospects.filter((p) => p.statut === s.key).length)
   );
 
+  const regionCounts = new Map<string, number>();
+  for (const p of prospects) {
+    const r = regionForDept(p.departement);
+    regionCounts.set(r, (regionCounts.get(r) ?? 0) + 1);
+  }
+  const regions = [...regionCounts.entries()].sort((a, b) => b[1] - a[1]);
+  const maxRegion = Math.max(1, ...regions.map((r) => r[1]));
+
   const kpis = [
     { label: "Prospects", value: total, icon: Users, color: "#2563eb" },
     { label: "Chauds", value: chauds, icon: Flame, color: "#dc2626" },
@@ -89,7 +97,7 @@ export default async function Dashboard() {
         <div className="rounded-2xl border border-line bg-white p-5">
           <h2 className="mb-4 font-display text-lg font-bold">Rappels à traiter</h2>
           {rappels.length === 0 ? (
-            <p className="text-sm text-mut">Aucun rappel en attente. 🎯</p>
+            <p className="text-sm text-mut">Aucun rappel en attente.</p>
           ) : (
             <ul className="space-y-2">
               {rappels.map((c) => {
@@ -172,6 +180,25 @@ export default async function Dashboard() {
                 </div>
               );
             })}
+          </div>
+        </div>
+
+        {/* Par région */}
+        <div className="rounded-2xl border border-line bg-white p-5 lg:col-span-2">
+          <h2 className="mb-4 font-display text-lg font-bold">Par région</h2>
+          <div className="space-y-2.5">
+            {regions.map(([r, n]) => (
+              <div key={r} className="flex items-center gap-3">
+                <span className="w-48 shrink-0 truncate text-sm text-mut">{r}</span>
+                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-paper">
+                  <div
+                    className="h-full rounded-full bg-emerald-500"
+                    style={{ width: `${(n / maxRegion) * 100}%` }}
+                  />
+                </div>
+                <span className="w-8 shrink-0 text-right text-sm font-semibold">{n}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Mic } from "lucide-react";
 import { getAllCalls, getAllProspects, indexProspects } from "@/lib/crmData";
 import { outcomeLabel } from "@/lib/crm";
 
@@ -72,7 +73,24 @@ export default async function JournalPage() {
                           {c.notes}
                         </p>
                       )}
+                      {c.tags && c.tags.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {c.tags.map((t) => (
+                            <span
+                              key={t}
+                              className="rounded-full bg-paper px-2 py-0.5 text-[11px] font-medium text-mut"
+                            >
+                              #{t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <div className="mt-2 flex items-center gap-3 text-[12px] text-mut">
+                        {c.recording_path && (
+                          <span className="inline-flex items-center gap-1 text-accent">
+                            <Mic size={13} /> audio
+                          </span>
+                        )}
                         <span>
                           {new Date(c.created_at).toLocaleTimeString("fr-FR", {
                             hour: "2-digit",

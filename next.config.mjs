@@ -5,6 +5,10 @@ const nextConfig = {
   images: {
     formats: ["image/avif", "image/webp"],
   },
+  experimental: {
+    // Permet d'envoyer les enregistrements audio via les Server Actions.
+    serverActions: { bodySizeLimit: "16mb" },
+  },
 };
 
 export default nextConfig;

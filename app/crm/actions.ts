@@ -20,9 +20,16 @@ export async function updateProspect(formData: FormData) {
   assertAuth();
   const id = String(formData.get("id"));
   const patch: Record<string, unknown> = {};
-  for (const f of ["nom", "centre", "ville", "telephone", "email", "statut", "interet", "notes"]) {
+  for (const f of ["nom", "centre", "ville", "departement", "telephone", "email", "statut", "interet", "notes"]) {
     const v = formData.get(f);
     if (v !== null) patch[f] = String(v) === "" ? null : String(v);
+  }
+  const tagsRaw = formData.get("tags");
+  if (tagsRaw !== null) {
+    patch.tags = String(tagsRaw)
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
   }
   const db = getDb();
   await db.from("neela_prospects").update(patch).eq("id", id);
@@ -31,7 +38,7 @@ export async function updateProspect(formData: FormData) {
   revalidatePath("/crm/prospects");
 }
 
-// Enregistre un appel sur la fiche + reporte le statut/intérêt sur le prospect.
+// Enregistre un appel sur la fiche (+ tags + audio) et reporte le statut/intérêt.
 export async function addCall(formData: FormData) {
   assertAuth();
   const prospectId = String(formData.get("prospect_id"));
@@ -42,7 +49,25 @@ export async function addCall(formData: FormData) {
   const rappelRaw = String(formData.get("rappel_at") || "");
   const rappel_at = rappelRaw ? new Date(rappelRaw).toISOString() : null;
 
+  const tags = String(formData.get("tags") || "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+
   const db = getDb();
+
+  // Upload de l'enregistrement audio s'il y en a un
+  let recording_path: string | null = null;
+  const audio = formData.get("audio");
+  if (audio && audio instanceof File && audio.size > 0) {
+    const buf = Buffer.from(await audio.arrayBuffer());
+    const path = `${prospectId}/${Date.now()}.webm`;
+    const { error } = await db.storage
+      .from("neela-recordings")
+      .upload(path, buf, { contentType: audio.type || "audio/webm", upsert: false });
+    if (!error) recording_path = path;
+  }
+
   await db.from("neela_calls").insert({
     prospect_id: prospectId,
     outcome: outcome || null,
@@ -50,6 +75,8 @@ export async function addCall(formData: FormData) {
     statut: statut || null,
     interet: interet || null,
     rappel_at,
+    tags,
+    recording_path,
   });
 
   // Reporter sur le prospect ce qui a changé

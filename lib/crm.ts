@@ -27,7 +27,24 @@ export type Call = {
   interet: string | null;
   notes: string | null;
   rappel_at: string | null;
+  tags: string[] | null;
+  recording_path: string | null;
 };
+
+// Régions françaises par département (pour regrouper la prospection).
+export const REGIONS: Record<string, string[]> = {
+  "Nouvelle-Aquitaine": ["17", "33", "40", "64"],
+  Occitanie: ["34", "30", "31", "11", "66"],
+  "Provence-Alpes-Côte d'Azur": ["06", "13", "83", "84", "04", "05"],
+};
+
+export function regionForDept(dept: string | null): string {
+  if (!dept) return "Autre";
+  for (const [region, depts] of Object.entries(REGIONS)) {
+    if (depts.includes(dept)) return region;
+  }
+  return "Autre";
+}
 
 export type Appointment = {
   id: string;

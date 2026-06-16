@@ -3,14 +3,15 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Prospect } from "@/lib/crm";
-import { statutLabel, interetMeta } from "@/lib/crm";
+import { statutLabel, interetMeta, regionForDept, REGIONS } from "@/lib/crm";
 
 export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
   const [q, setQ] = useState("");
   const [dept, setDept] = useState("");
+  const [region, setRegion] = useState("");
   const [interet, setInteret] = useState("");
   const [statut, setStatut] = useState("");
-  const [groupBy, setGroupBy] = useState<"" | "departement" | "ville">("");
+  const [groupBy, setGroupBy] = useState<"" | "region" | "departement" | "ville">("");
 
   const depts = useMemo(
     () =>
@@ -22,6 +23,7 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
     const needle = q.trim().toLowerCase();
     return prospects.filter((p) => {
       if (dept && p.departement !== dept) return false;
+      if (region && regionForDept(p.departement) !== region) return false;
       if (interet && p.interet !== interet) return false;
       if (statut && p.statut !== statut) return false;
       if (needle) {
@@ -30,13 +32,16 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
       }
       return true;
     });
-  }, [prospects, q, dept, interet, statut]);
+  }, [prospects, q, dept, region, interet, statut]);
 
   const groups = useMemo(() => {
     if (!groupBy) return [{ key: "", items: filtered }];
     const m = new Map<string, Prospect[]>();
     for (const p of filtered) {
-      const k = (p[groupBy] as string) || "—";
+      const k =
+        groupBy === "region"
+          ? regionForDept(p.departement)
+          : (p[groupBy] as string) || "—";
       if (!m.has(k)) m.set(k, []);
       m.get(k)!.push(p);
     }
@@ -57,6 +62,14 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
           placeholder="Rechercher (nom, ville, notes…)"
           className={`${inputCls} min-w-[200px] flex-1`}
         />
+        <select value={region} onChange={(e) => setRegion(e.target.value)} className={inputCls}>
+          <option value="">Toutes régions</option>
+          {Object.keys(REGIONS).map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
         <select value={dept} onChange={(e) => setDept(e.target.value)} className={inputCls}>
           <option value="">Tous dépts</option>
           {depts.map((d) => (
@@ -82,10 +95,11 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
         </select>
         <select
           value={groupBy}
-          onChange={(e) => setGroupBy(e.target.value as "" | "departement" | "ville")}
+          onChange={(e) => setGroupBy(e.target.value as "" | "region" | "departement" | "ville")}
           className={inputCls}
         >
           <option value="">Sans groupe</option>
+          <option value="region">Par région</option>
           <option value="departement">Par département</option>
           <option value="ville">Par ville</option>
         </select>

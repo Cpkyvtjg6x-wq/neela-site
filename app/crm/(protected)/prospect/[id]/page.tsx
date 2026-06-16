@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/supabaseAdmin";
 import type { Prospect, Call } from "@/lib/crm";
-import { STATUTS, OUTCOMES, INTERETS, outcomeLabel, interetMeta } from "@/lib/crm";
-import { updateProspect, addCall } from "@/app/crm/actions";
+import { STATUTS, INTERETS, outcomeLabel, interetMeta, regionForDept } from "@/lib/crm";
+import { updateProspect } from "@/app/crm/actions";
+import CallForm from "@/components/crm/CallForm";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,18 @@ export default async function ProspectPage({
     .order("created_at", { ascending: false });
   const calls = (callsData ?? []) as Call[];
 
+  // URLs signées pour les enregistrements
+  const withRec = calls.filter((c) => c.recording_path);
+  const signed = await Promise.all(
+    withRec.map(async (c) => {
+      const { data } = await db.storage
+        .from("neela-recordings")
+        .createSignedUrl(c.recording_path!, 3600);
+      return [c.id, data?.signedUrl ?? null] as const;
+    })
+  );
+  const urlMap = new Map(signed);
+
   const im = interetMeta(p.interet);
   const field =
     "w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent";
@@ -62,13 +75,23 @@ export default async function ProspectPage({
                 {im.label}
               </span>
             )}
-            <h1 className="font-display text-2xl font-bold tracking-tight">
-              {p.nom}
-            </h1>
+            <h1 className="font-display text-2xl font-bold tracking-tight">{p.nom}</h1>
           </div>
           <p className="mt-1 text-sm text-mut">
-            {p.ville} ({p.departement}) · {p.centre}
+            {p.ville} ({p.departement}) · {regionForDept(p.departement)} · {p.centre}
           </p>
+          {p.tags && p.tags.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {p.tags.map((t) => (
+                <span
+                  key={t}
+                  className="rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         {p.telephone && (
           <a
@@ -81,13 +104,9 @@ export default async function ProspectPage({
       </div>
 
       <div className="mt-7 grid gap-6 lg:grid-cols-[1.1fr_1fr]">
-        {/* Colonne gauche : fiche éditable + nouvel appel */}
         <div className="space-y-6">
           {/* Fiche */}
-          <form
-            action={updateProspect}
-            className="rounded-2xl border border-line bg-white p-5"
-          >
+          <form action={updateProspect} className="rounded-2xl border border-line bg-white p-5">
             <input type="hidden" name="id" value={p.id} />
             <h2 className="mb-4 font-display text-lg font-bold">Fiche</h2>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -98,6 +117,14 @@ export default async function ProspectPage({
               <div>
                 <p className={label}>Email</p>
                 <input name="email" defaultValue={p.email ?? ""} className={field} />
+              </div>
+              <div>
+                <p className={label}>Ville</p>
+                <input name="ville" defaultValue={p.ville ?? ""} className={field} />
+              </div>
+              <div>
+                <p className={label}>Département</p>
+                <input name="departement" defaultValue={p.departement ?? ""} maxLength={3} className={field} />
               </div>
               <div>
                 <p className={label}>Statut</p>
@@ -122,13 +149,12 @@ export default async function ProspectPage({
               </div>
             </div>
             <div className="mt-3">
+              <p className={label}>Tags (séparés par des virgules)</p>
+              <input name="tags" defaultValue={(p.tags ?? []).join(", ")} className={field} />
+            </div>
+            <div className="mt-3">
               <p className={label}>Notes</p>
-              <textarea
-                name="notes"
-                defaultValue={p.notes ?? ""}
-                rows={6}
-                className={field}
-              />
+              <textarea name="notes" defaultValue={p.notes ?? ""} rows={6} className={field} />
             </div>
             <button
               type="submit"
@@ -138,103 +164,55 @@ export default async function ProspectPage({
             </button>
           </form>
 
-          {/* Nouvel appel */}
-          <form
-            action={addCall}
-            className="rounded-2xl border border-line bg-white p-5"
-          >
-            <input type="hidden" name="prospect_id" value={p.id} />
-            <h2 className="mb-4 font-display text-lg font-bold">
-              Enregistrer un appel
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <p className={label}>Résultat</p>
-                <select name="outcome" defaultValue="" className={field}>
-                  <option value="">—</option>
-                  {OUTCOMES.map((o) => (
-                    <option key={o.key} value={o.key}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <p className={label}>Rappel le</p>
-                <input type="datetime-local" name="rappel_at" className={field} />
-              </div>
-              <div>
-                <p className={label}>Nouveau statut</p>
-                <select name="statut" defaultValue="" className={field}>
-                  <option value="">(inchangé)</option>
-                  {STATUTS.map((s) => (
-                    <option key={s.key} value={s.key}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <p className={label}>Nouvel intérêt</p>
-                <select name="interet" defaultValue="" className={field}>
-                  <option value="">(inchangé)</option>
-                  {INTERETS.map((s) => (
-                    <option key={s.key} value={s.key}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="mt-3">
-              <p className={label}>Notes d'appel</p>
-              <textarea name="notes" rows={3} className={field} />
-            </div>
-            <button
-              type="submit"
-              className="mt-4 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
-            >
-              Ajouter l'appel
-            </button>
-          </form>
+          {/* Nouvel appel (avec audio + tags) */}
+          <CallForm prospectId={p.id} />
         </div>
 
-        {/* Colonne droite : historique */}
+        {/* Historique */}
         <div>
-          <h2 className="mb-4 font-display text-lg font-bold">
-            Historique des appels
-          </h2>
+          <h2 className="mb-4 font-display text-lg font-bold">Historique des appels</h2>
           {calls.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-line p-6 text-center text-sm text-mut">
               Aucun appel enregistré pour l'instant.
             </p>
           ) : (
             <div className="space-y-3">
-              {calls.map((c) => (
-                <div
-                  key={c.id}
-                  className="rounded-2xl border border-line bg-white p-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-bold text-ink">
-                      {outcomeLabel(c.outcome)}
-                    </span>
-                    <span className="text-[12px] text-mut">
-                      {fmt(c.created_at)}
-                    </span>
+              {calls.map((c) => {
+                const url = urlMap.get(c.id);
+                return (
+                  <div key={c.id} className="rounded-2xl border border-line bg-white p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] font-bold text-ink">
+                        {outcomeLabel(c.outcome)}
+                      </span>
+                      <span className="text-[12px] text-mut">{fmt(c.created_at)}</span>
+                    </div>
+                    {c.notes && (
+                      <p className="mt-2 whitespace-pre-wrap text-[13px] text-ink/80">{c.notes}</p>
+                    )}
+                    {c.tags && c.tags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {c.tags.map((t) => (
+                          <span
+                            key={t}
+                            className="rounded-full bg-paper px-2 py-0.5 text-[11px] font-medium text-mut"
+                          >
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {url && (
+                      <audio controls src={url} className="mt-3 h-9 w-full" />
+                    )}
+                    {c.rappel_at && (
+                      <p className="mt-2 inline-block rounded-full bg-amber-100 px-2.5 py-0.5 text-[12px] font-semibold text-amber-700">
+                        Rappel : {fmt(c.rappel_at)}
+                      </p>
+                    )}
                   </div>
-                  {c.notes && (
-                    <p className="mt-2 whitespace-pre-wrap text-[13px] text-ink/80">
-                      {c.notes}
-                    </p>
-                  )}
-                  {c.rappel_at && (
-                    <p className="mt-2 inline-block rounded-full bg-amber-100 px-2.5 py-0.5 text-[12px] font-semibold text-amber-700">
-                      Rappel : {fmt(c.rappel_at)}
-                    </p>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
