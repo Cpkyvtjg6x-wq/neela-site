@@ -11,7 +11,7 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
   const [region, setRegion] = useState("");
   const [interet, setInteret] = useState("");
   const [statut, setStatut] = useState("");
-  const [groupBy, setGroupBy] = useState<"" | "region" | "departement" | "ville">("");
+  const [groupBy, setGroupBy] = useState<"" | "region" | "departement" | "ville">("region");
 
   const depts = useMemo(
     () =>
@@ -111,9 +111,14 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
         {groups.map((g) => (
           <div key={g.key}>
             {g.key && (
-              <h3 className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-mut">
-                {groupBy === "departement" ? `Département ${g.key}` : g.key} ({g.items.length})
-              </h3>
+              <div className="mb-2 flex items-center justify-between rounded-xl bg-accent/10 px-4 py-2.5">
+                <span className="font-display text-sm font-bold text-accent">
+                  {groupBy === "departement" ? `Département ${g.key}` : g.key}
+                </span>
+                <span className="text-xs font-semibold text-accent/70">
+                  {g.items.length} centre{g.items.length > 1 ? "s" : ""}
+                </span>
+              </div>
             )}
             <div className="overflow-hidden rounded-2xl border border-line bg-white">
               {g.items.map((p, i) => {

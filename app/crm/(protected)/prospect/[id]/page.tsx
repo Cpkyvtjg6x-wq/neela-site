@@ -5,6 +5,8 @@ import type { Prospect, Call } from "@/lib/crm";
 import { STATUTS, INTERETS, outcomeLabel, interetMeta, regionForDept } from "@/lib/crm";
 import { updateProspect } from "@/app/crm/actions";
 import CallForm from "@/components/crm/CallForm";
+import TagInput from "@/components/crm/TagInput";
+import Tag from "@/components/crm/Tag";
 
 export const dynamic = "force-dynamic";
 
@@ -83,12 +85,7 @@ export default async function ProspectPage({
           {p.tags && p.tags.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {p.tags.map((t) => (
-                <span
-                  key={t}
-                  className="rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent"
-                >
-                  {t}
-                </span>
+                <Tag key={t} label={t} />
               ))}
             </div>
           )}
@@ -149,8 +146,8 @@ export default async function ProspectPage({
               </div>
             </div>
             <div className="mt-3">
-              <p className={label}>Tags (séparés par des virgules)</p>
-              <input name="tags" defaultValue={(p.tags ?? []).join(", ")} className={field} />
+              <p className={label}>Tags</p>
+              <TagInput name="tags" defaultValue={p.tags ?? []} />
             </div>
             <div className="mt-3">
               <p className={label}>Notes</p>
@@ -193,12 +190,7 @@ export default async function ProspectPage({
                     {c.tags && c.tags.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {c.tags.map((t) => (
-                          <span
-                            key={t}
-                            className="rounded-full bg-paper px-2 py-0.5 text-[11px] font-medium text-mut"
-                          >
-                            #{t}
-                          </span>
+                          <Tag key={t} label={t} hash />
                         ))}
                       </div>
                     )}

@@ -46,6 +46,24 @@ export function regionForDept(dept: string | null): string {
   return "Autre";
 }
 
+// Couleur déterministe pour un tag (toujours la même pour un libellé donné).
+const TAG_PALETTE = [
+  { bg: "#EAF1FF", text: "#2563EB" },
+  { bg: "#E8F6EE", text: "#059669" },
+  { bg: "#FDECEC", text: "#DC2626" },
+  { bg: "#FEF3E2", text: "#C2730A" },
+  { bg: "#F1ECFE", text: "#7C3AED" },
+  { bg: "#E7F6F8", text: "#0E7490" },
+  { bg: "#FDEAF4", text: "#DB2777" },
+  { bg: "#EEF2F6", text: "#475569" },
+];
+
+export function tagColor(tag: string) {
+  let h = 0;
+  for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
+  return TAG_PALETTE[h % TAG_PALETTE.length];
+}
+
 export type Appointment = {
   id: string;
   prospect_id: string | null;

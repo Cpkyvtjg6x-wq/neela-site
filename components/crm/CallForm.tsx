@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Mic, Square, Trash2 } from "lucide-react";
 import { OUTCOMES, STATUTS, INTERETS } from "@/lib/crm";
 import { addCall } from "@/app/crm/actions";
+import TagInput from "./TagInput";
 
 export default function CallForm({ prospectId }: { prospectId: string }) {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function CallForm({ prospectId }: { prospectId: string }) {
   const [pending, startTransition] = useTransition();
 
   const [recording, setRecording] = useState(false);
+  const [tagKey, setTagKey] = useState(0);
   const [blob, setBlob] = useState<Blob | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -60,6 +62,7 @@ export default function CallForm({ prospectId }: { prospectId: string }) {
       await addCall(fd);
       formRef.current?.reset();
       clearRec();
+      setTagKey((k) => k + 1);
       router.refresh();
     });
   }
@@ -117,8 +120,8 @@ export default function CallForm({ prospectId }: { prospectId: string }) {
       </div>
 
       <div className="mt-3">
-        <p className={label}>Tags (séparés par des virgules)</p>
-        <input name="tags" placeholder="ex : décideur absent, à relancer, intéressé" className={field} />
+        <p className={label}>Tags</p>
+        <TagInput key={tagKey} name="tags" placeholder="ex : décideur absent, à relancer…" />
       </div>
 
       <div className="mt-3">

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Mic } from "lucide-react";
 import { getAllCalls, getAllProspects, indexProspects } from "@/lib/crmData";
 import { outcomeLabel } from "@/lib/crm";
+import Tag from "@/components/crm/Tag";
 
 export const dynamic = "force-dynamic";
 
@@ -76,12 +77,7 @@ export default async function JournalPage() {
                       {c.tags && c.tags.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {c.tags.map((t) => (
-                            <span
-                              key={t}
-                              className="rounded-full bg-paper px-2 py-0.5 text-[11px] font-medium text-mut"
-                            >
-                              #{t}
-                            </span>
+                            <Tag key={t} label={t} hash />
                           ))}
                         </div>
                       )}
