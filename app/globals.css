@@ -76,6 +76,33 @@ html.lenis body {
   }
 }
 
+/* Équaliseur audio (mockups pub) — transform-only, performant */
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.28);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+.eqbar {
+  display: block;
+  width: 6px;
+  height: 52px;
+  border-radius: 3px;
+  transform-origin: bottom;
+  animation: eq 1.2s ease-in-out infinite;
+}
+
+/* Ombres premium réutilisables */
+.shadow-card {
+  box-shadow: 0 30px 70px rgba(16, 40, 90, 0.12);
+}
+.shadow-float {
+  box-shadow: 0 40px 90px rgba(16, 40, 90, 0.18);
+}
+
 /* Respect de prefers-reduced-motion : on neutralise les animations lourdes */
 @media (prefers-reduced-motion: reduce) {
   *,
