@@ -1,0 +1,55 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard,
+  Users,
+  CalendarDays,
+  PhoneCall,
+  LogOut,
+} from "lucide-react";
+import { logout } from "@/app/crm/actions";
+
+const NAV = [
+  { href: "/crm", label: "Tableau de bord", icon: LayoutDashboard, match: (p: string) => p === "/crm" },
+  { href: "/crm/prospects", label: "Prospects", icon: Users, match: (p: string) => p.startsWith("/crm/prospect") },
+  { href: "/crm/agenda", label: "Agenda", icon: CalendarDays, match: (p: string) => p.startsWith("/crm/agenda") },
+  { href: "/crm/journal", label: "Journal", icon: PhoneCall, match: (p: string) => p.startsWith("/crm/journal") },
+];
+
+export default function Sidebar() {
+  const path = usePathname() || "/crm";
+
+  return (
+    <nav className="flex gap-1 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0">
+      {NAV.map((n) => {
+        const active = n.match(path);
+        const Icon = n.icon;
+        return (
+          <Link
+            key={n.href}
+            href={n.href}
+            className={`flex items-center gap-2.5 whitespace-nowrap rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors ${
+              active
+                ? "bg-accent/10 text-accent"
+                : "text-mut hover:bg-white hover:text-ink"
+            }`}
+          >
+            <Icon size={18} strokeWidth={2} />
+            {n.label}
+          </Link>
+        );
+      })}
+      <form action={logout} className="md:mt-2">
+        <button
+          type="submit"
+          className="flex w-full items-center gap-2.5 whitespace-nowrap rounded-xl px-3.5 py-2.5 text-sm font-medium text-mut transition-colors hover:bg-white hover:text-ink"
+        >
+          <LogOut size={18} strokeWidth={2} />
+          Déconnexion
+        </button>
+      </form>
+    </nav>
+  );
+}

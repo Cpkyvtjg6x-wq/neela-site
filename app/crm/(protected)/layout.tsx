@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isAuthed } from "@/lib/auth";
-import { logout } from "../actions";
+import Sidebar from "@/components/crm/Sidebar";
 
 export const dynamic = "force-dynamic";
 
@@ -13,29 +13,22 @@ export default function ProtectedLayout({
   if (!isAuthed()) redirect("/crm/login");
 
   return (
-    <div className="min-h-screen bg-paper">
-      <header className="sticky top-0 z-30 border-b border-line bg-paper/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3">
-          <Link
-            href="/crm"
-            className="flex items-center gap-2.5 font-display text-lg font-bold tracking-tight"
-          >
-            <span className="h-2.5 w-2.5 rounded-full bg-accent" />
-            Neela CRM
-          </Link>
-          <nav className="flex items-center gap-5 text-sm font-medium text-mut">
-            <Link href="/crm" className="hover:text-ink">
-              Prospects
+    <div className="min-h-screen bg-paper text-ink">
+      <div className="mx-auto max-w-6xl px-4 md:px-6">
+        <div className="md:grid md:grid-cols-[224px_1fr] md:gap-8">
+          <aside className="sticky top-0 z-20 -mx-4 border-b border-line bg-paper/90 px-4 py-3 backdrop-blur md:mx-0 md:max-h-screen md:border-b-0 md:px-0 md:py-7">
+            <Link
+              href="/crm"
+              className="mb-4 hidden items-center gap-2.5 px-3.5 font-display text-lg font-bold tracking-tight md:flex"
+            >
+              <span className="h-2.5 w-2.5 rounded-full bg-accent" />
+              Neela CRM
             </Link>
-            <form action={logout}>
-              <button type="submit" className="hover:text-ink">
-                Déconnexion
-              </button>
-            </form>
-          </nav>
+            <Sidebar />
+          </aside>
+          <main className="py-7">{children}</main>
         </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-5 py-8">{children}</main>
+      </div>
     </div>
   );
 }

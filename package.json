@@ -14,7 +14,8 @@
     "framer-motion": "11.5.4",
     "gsap": "3.12.5",
     "lenis": "1.1.13",
-    "@supabase/supabase-js": "2.45.4"
+    "@supabase/supabase-js": "2.45.4",
+    "lucide-react": "0.441.0"
   },
   "devDependencies": {
     "typescript": "5.5.4",

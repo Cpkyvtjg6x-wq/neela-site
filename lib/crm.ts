@@ -29,6 +29,21 @@ export type Call = {
   rappel_at: string | null;
 };
 
+export type Appointment = {
+  id: string;
+  prospect_id: string | null;
+  created_at: string;
+  start_at: string;
+  end_at: string | null;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  message: string | null;
+  status: string;
+  source: string;
+  google_event_id: string | null;
+};
+
 export const STATUTS: { key: string; label: string }[] = [
   { key: "a_appeler", label: "À appeler" },
   { key: "a_rappeler", label: "À rappeler" },

@@ -47,7 +47,7 @@ export default async function ProspectPage({
 
   return (
     <div>
-      <Link href="/crm" className="text-sm text-mut hover:text-accent">
+      <Link href="/crm/prospects" className="text-sm text-mut hover:text-accent">
         ← Tous les prospects
       </Link>
 
