@@ -2,10 +2,6 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { display, sans } from "@/lib/fonts";
 import { SITE } from "@/lib/site";
-import SmoothScroll from "@/components/SmoothScroll";
-import Cursor from "@/components/Cursor";
-import Nav from "@/components/Nav";
-import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
@@ -30,7 +26,6 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-// Données structurées (Organization) pour le SEO.
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "Organization",
@@ -48,17 +43,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr" className={`${display.variable} ${sans.variable}`}>
-      <body className="grain antialiased">
+      <body className="antialiased">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        <Cursor />
-        <SmoothScroll>
-          <Nav />
-          <main>{children}</main>
-          <Footer />
-        </SmoothScroll>
+        {children}
       </body>
     </html>
   );
