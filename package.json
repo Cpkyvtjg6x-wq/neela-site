@@ -1,0 +1,27 @@
+{
+  "name": "neela-site",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "14.2.15",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "framer-motion": "11.5.4",
+    "gsap": "3.12.5",
+    "lenis": "1.1.13"
+  },
+  "devDependencies": {
+    "typescript": "5.5.4",
+    "@types/node": "20.14.10",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "tailwindcss": "3.4.13",
+    "postcss": "8.4.47",
+    "autoprefixer": "10.4.20"
+  }
+}
