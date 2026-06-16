@@ -33,7 +33,7 @@ export default function HorizontalAds() {
   const x = useTransform(scrollYProgress, [0, 1], [0, -dist]);
 
   return (
-    <section ref={section} className="relative h-[420vh] bg-paper">
+    <section ref={section} className="relative h-[300vh] bg-paper">
       <div className="sticky top-0 flex h-[100svh] items-center overflow-hidden">
         <motion.div
           ref={track}

@@ -1,17 +1,19 @@
 "use client";
 
+import { Fragment } from "react";
 import { motion } from "framer-motion";
 import { EASE } from "@/lib/site";
 
 /**
- * Révèle un texte mot par mot (masque + translation Y) au scroll.
- * `as` permet de choisir la balise (h1, h2, p...).
+ * Révèle un texte mot par mot (fondu + légère montée) au scroll.
+ * Robuste : l'état final est toujours visible (opacity 1), et les mots
+ * restent séparés par de vraies espaces (le titre peut donc revenir à la ligne).
  */
 export default function RevealText({
   text,
   className = "",
   delay = 0,
-  stagger = 0.06,
+  stagger = 0.04,
   once = true,
 }: {
   text: string;
@@ -25,27 +27,23 @@ export default function RevealText({
   return (
     <span className={className} aria-label={text}>
       {words.map((word, i) => (
-        <span
-          key={i}
-          aria-hidden
-          className="inline-block overflow-hidden align-bottom"
-          style={{ paddingBottom: "0.08em" }}
-        >
+        <Fragment key={i}>
           <motion.span
+            aria-hidden
             className="inline-block"
-            initial={{ y: "110%" }}
-            whileInView={{ y: "0%" }}
+            initial={{ opacity: 0, y: "0.35em" }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once, margin: "-8% 0px" }}
             transition={{
-              duration: 0.75,
+              duration: 0.6,
               ease: EASE,
               delay: delay + i * stagger,
             }}
           >
             {word}
-            {i < words.length - 1 ? " " : ""}
           </motion.span>
-        </span>
+          {i < words.length - 1 ? " " : null}
+        </Fragment>
       ))}
     </span>
   );
