@@ -141,6 +141,82 @@ export async function addAppointment(formData: FormData) {
   revalidatePath("/crm");
 }
 
+// Import d'un appel depuis l'ancien CRM (relié au prospect par son nom).
+export async function importCall(formData: FormData) {
+  assertAuth();
+  const nom = String(formData.get("nom") || "").trim();
+  if (!nom) return { ok: false, reason: "no-nom" };
+  const ville = String(formData.get("ville") || "") || null;
+  const outcome = String(formData.get("outcome") || "") || null;
+  const note = String(formData.get("note") || "") || null;
+  const atRaw = String(formData.get("at") || "");
+  const rappelRaw = String(formData.get("rappelAt") || "");
+
+  const parseDate = (v: string) => {
+    if (!v) return null;
+    const n = Number(v);
+    const d = new Date(isNaN(n) ? v : n);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  };
+  const created_at = parseDate(atRaw) ?? new Date().toISOString();
+  const rappel_at = parseDate(rappelRaw);
+
+  const db = getDb();
+
+  // Retrouver le prospect par son nom (sinon le créer)
+  const { data: found } = await db
+    .from("neela_prospects")
+    .select("id")
+    .ilike("nom", nom)
+    .limit(1);
+  let prospectId = found?.[0]?.id as string | undefined;
+  if (!prospectId) {
+    const { data: created } = await db
+      .from("neela_prospects")
+      .insert({ nom, ville, source: "sortant", statut: "a_appeler" })
+      .select("id")
+      .single();
+    prospectId = created?.id;
+  }
+  if (!prospectId) return { ok: false, reason: "no-prospect" };
+
+  // Éviter les doublons si l'import est relancé
+  const { data: dup } = await db
+    .from("neela_calls")
+    .select("id")
+    .eq("prospect_id", prospectId)
+    .eq("created_at", created_at)
+    .limit(1);
+  if (dup && dup.length) return { ok: true, dup: true };
+
+  // Upload de l'audio s'il y en a un
+  let recording_path: string | null = null;
+  const audio = formData.get("audio");
+  if (audio && audio instanceof File && audio.size > 0) {
+    const buf = Buffer.from(await audio.arrayBuffer());
+    const path = `${prospectId}/${Number(atRaw) || Date.now()}.webm`;
+    const { error } = await db.storage
+      .from("neela-recordings")
+      .upload(path, buf, { contentType: "audio/webm", upsert: true });
+    if (!error) recording_path = path;
+  }
+
+  await db.from("neela_calls").insert({
+    prospect_id: prospectId,
+    outcome,
+    notes: note,
+    created_at,
+    rappel_at,
+    recording_path,
+    tags: [],
+  });
+
+  revalidatePath("/crm");
+  revalidatePath("/crm/journal");
+  revalidatePath(`/crm/prospect/${prospectId}`);
+  return { ok: true };
+}
+
 // Met à jour le statut d'un rendez-vous (honoré / annulé / no-show).
 export async function updateAppointmentStatus(formData: FormData) {
   assertAuth();
