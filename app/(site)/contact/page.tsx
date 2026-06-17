@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SITE } from "@/lib/site";
+import ContactForm from "@/components/ContactForm";
 
 export const metadata: Metadata = {
   title: "Contact",
@@ -8,6 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default function ContactPage() {
+  const tel = SITE.phone.replace(/\s/g, "");
   return (
     <div className="container-wide grid gap-16 pt-40 pb-32 md:grid-cols-[1fr_1fr]">
       <div>
@@ -28,72 +30,16 @@ export default function ContactPage() {
           >
             {SITE.email}
           </a>
+          {SITE.phone && (
+            <a href={`tel:${tel}`} className="block text-lg font-semibold hover:text-accent">
+              {SITE.phone}
+            </a>
+          )}
           <p className="text-mut">{SITE.city}</p>
         </div>
       </div>
 
-      {/* Formulaire élégant. Action mailto pour rester simple et sans backend. */}
-      <form
-        action={`mailto:${SITE.email}`}
-        method="post"
-        encType="text/plain"
-        className="rounded-3xl border border-line p-8"
-      >
-        <div className="space-y-5">
-          <div>
-            <label htmlFor="nom" className="text-sm font-medium text-mut">
-              Votre nom
-            </label>
-            <input
-              id="nom"
-              name="nom"
-              type="text"
-              required
-              className="mt-2 w-full rounded-xl border border-line bg-paper px-4 py-3 text-[15px] outline-none focus:border-accent"
-            />
-          </div>
-          <div>
-            <label htmlFor="centre" className="text-sm font-medium text-mut">
-              Nom du centre
-            </label>
-            <input
-              id="centre"
-              name="centre"
-              type="text"
-              className="mt-2 w-full rounded-xl border border-line bg-paper px-4 py-3 text-[15px] outline-none focus:border-accent"
-            />
-          </div>
-          <div>
-            <label htmlFor="email" className="text-sm font-medium text-mut">
-              Email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              className="mt-2 w-full rounded-xl border border-line bg-paper px-4 py-3 text-[15px] outline-none focus:border-accent"
-            />
-          </div>
-          <div>
-            <label htmlFor="message" className="text-sm font-medium text-mut">
-              Message
-            </label>
-            <textarea
-              id="message"
-              name="message"
-              rows={4}
-              className="mt-2 w-full rounded-xl border border-line bg-paper px-4 py-3 text-[15px] outline-none focus:border-accent"
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full rounded-full bg-ink px-7 py-3.5 text-[15px] font-semibold text-paper transition-colors hover:bg-accent"
-          >
-            Envoyer ma demande
-          </button>
-        </div>
-      </form>
+      <ContactForm />
     </div>
   );
 }

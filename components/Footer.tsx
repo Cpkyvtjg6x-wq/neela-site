@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { SITE } from "@/lib/site";
 
+const SOCIALS = [
+  { label: "LinkedIn", href: SITE.socials.linkedin },
+  { label: "Instagram", href: SITE.socials.instagram },
+  { label: "Facebook", href: SITE.socials.facebook },
+].filter((s) => s.href && s.href !== "#");
+
 export default function Footer() {
+  const tel = SITE.phone.replace(/\s/g, "");
   return (
     <footer className="border-t border-line bg-paper">
       <div className="container-wide py-20">
@@ -25,21 +32,11 @@ export default function Footer() {
               Navigation
             </p>
             <ul className="mt-5 space-y-3 text-[15px]">
-              <li>
-                <Link href="/services" className="text-ink/80 hover:text-accent">
-                  Services
-                </Link>
-              </li>
-              <li>
-                <Link href="/realisations" className="text-ink/80 hover:text-accent">
-                  Réalisations
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="text-ink/80 hover:text-accent">
-                  Contact
-                </Link>
-              </li>
+              <li><Link href="/services" className="text-ink/80 hover:text-accent">Services</Link></li>
+              <li><Link href="/realisations" className="text-ink/80 hover:text-accent">Réalisations</Link></li>
+              <li><Link href="/contact" className="text-ink/80 hover:text-accent">Contact</Link></li>
+              <li><Link href="/mentions-legales" className="text-ink/80 hover:text-accent">Mentions légales</Link></li>
+              <li><Link href="/confidentialite" className="text-ink/80 hover:text-accent">Confidentialité</Link></li>
             </ul>
           </div>
 
@@ -48,11 +45,10 @@ export default function Footer() {
               Contact
             </p>
             <ul className="mt-5 space-y-3 text-[15px]">
-              <li>
-                <a href={`mailto:${SITE.email}`} className="text-ink/80 hover:text-accent">
-                  {SITE.email}
-                </a>
-              </li>
+              <li><a href={`mailto:${SITE.email}`} className="text-ink/80 hover:text-accent">{SITE.email}</a></li>
+              {SITE.phone && (
+                <li><a href={`tel:${tel}`} className="text-ink/80 hover:text-accent">{SITE.phone}</a></li>
+              )}
               <li className="text-mut">{SITE.city}</li>
             </ul>
           </div>
@@ -60,11 +56,13 @@ export default function Footer() {
 
         <div className="mt-16 flex flex-col items-start justify-between gap-4 border-t border-line pt-8 text-sm text-mut md:flex-row md:items-center">
           <p>© {new Date().getFullYear()} Neela. Tous droits réservés.</p>
-          <div className="flex gap-5">
-            <a href={SITE.socials.linkedin} className="hover:text-accent">LinkedIn</a>
-            <a href={SITE.socials.instagram} className="hover:text-accent">Instagram</a>
-            <a href={SITE.socials.facebook} className="hover:text-accent">Facebook</a>
-          </div>
+          {SOCIALS.length > 0 && (
+            <div className="flex gap-5">
+              {SOCIALS.map((s) => (
+                <a key={s.label} href={s.href} className="hover:text-accent">{s.label}</a>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </footer>
