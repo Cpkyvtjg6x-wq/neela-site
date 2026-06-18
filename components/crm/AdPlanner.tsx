@@ -1,10 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Target, Wallet } from "lucide-react";
+import { Target, Wallet, ShieldCheck, Gauge, Rocket } from "lucide-react";
 
 const eur = (n: number) => Math.round(n).toLocaleString("fr-FR") + " €";
 const num = (n: number) => Math.round(n).toLocaleString("fr-FR");
+
+type ScenKey = "prudent" | "realiste" | "optimiste";
+const SCENARIOS: Record<ScenKey, { cpl: number; leadToRdv: number; presence: number; closing: number; label: string }> = {
+  prudent:   { cpl: 18, leadToRdv: 25, presence: 65, closing: 20, label: "Prudent" },
+  realiste:  { cpl: 14, leadToRdv: 35, presence: 70, closing: 25, label: "Réaliste" },
+  optimiste: { cpl: 10, leadToRdv: 45, presence: 80, closing: 33, label: "Optimiste" },
+};
 
 function Slider({
   label, value, set, min, max, step = 1, suffix = "",
@@ -35,12 +42,21 @@ export default function AdPlanner() {
   const [targetRdv, setTargetRdv] = useState(20);
   const [budget, setBudget] = useState(1000);
 
-  const [cpl, setCpl] = useState(12);
-  const [leadToRdv, setLeadToRdv] = useState(50);
-  const [presence, setPresence] = useState(80);
-  const [closing, setClosing] = useState(30);
+  const [scenario, setScenario] = useState<ScenKey | null>("realiste");
+  const [cpl, setCpl] = useState(SCENARIOS.realiste.cpl);
+  const [leadToRdv, setLeadToRdv] = useState(SCENARIOS.realiste.leadToRdv);
+  const [presence, setPresence] = useState(SCENARIOS.realiste.presence);
+  const [closing, setClosing] = useState(SCENARIOS.realiste.closing);
   const [marge, setMarge] = useState(1200);
   const [fee, setFee] = useState(990);
+
+  const applyScenario = (k: ScenKey) => {
+    const s = SCENARIOS[k];
+    setCpl(s.cpl); setLeadToRdv(s.leadToRdv); setPresence(s.presence); setClosing(s.closing);
+    setScenario(k);
+  };
+  // un réglage manuel d'une hypothèse => scénario "perso"
+  const A = (setter: (n: number) => void) => (n: number) => { setter(n); setScenario(null); };
 
   const r = useMemo(() => {
     const l2r = leadToRdv / 100, pres = presence / 100, cl = closing / 100;
@@ -73,6 +89,11 @@ export default function AdPlanner() {
   const fmax = Math.max(1, r.leads);
 
   const card = "rounded-2xl border border-line bg-white p-5";
+  const scenIcons: Record<ScenKey, JSX.Element> = {
+    prudent: <ShieldCheck size={15} />,
+    realiste: <Gauge size={15} />,
+    optimiste: <Rocket size={15} />,
+  };
 
   return (
     <div>
@@ -84,7 +105,7 @@ export default function AdPlanner() {
       </div>
 
       {/* Mode */}
-      <div className="mb-6 inline-flex rounded-full border border-line bg-white p-1">
+      <div className="mb-5 inline-flex rounded-full border border-line bg-white p-1">
         <button
           onClick={() => setMode("objectif")}
           className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ${
@@ -101,6 +122,31 @@ export default function AdPlanner() {
         >
           <Wallet size={16} /> Partir d'un budget
         </button>
+      </div>
+
+      {/* Scénario */}
+      <div className="mb-6 rounded-2xl border border-line bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-ink">Scénario d'hypothèses</p>
+            <p className="text-xs text-mut">
+              {scenario ? `Réglage « ${SCENARIOS[scenario].label} »` : "Réglage personnalisé"} — montre le bas de la fourchette au client, jamais le haut.
+            </p>
+          </div>
+          <div className="inline-flex gap-2">
+            {(Object.keys(SCENARIOS) as ScenKey[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => applyScenario(k)}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                  scenario === k ? "border-accent bg-accent text-white" : "border-line text-mut hover:border-accent"
+                }`}
+              >
+                {scenIcons[k]} {SCENARIOS[k].label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
@@ -120,10 +166,10 @@ export default function AdPlanner() {
           <div className={card}>
             <h2 className="mb-4 font-display text-base font-bold">Hypothèses (ajustables)</h2>
             <div className="space-y-4">
-              <Slider label="Coût par lead (CPL)" value={cpl} set={setCpl} min={4} max={40} suffix=" €" />
-              <Slider label="Taux lead → RDV" value={leadToRdv} set={setLeadToRdv} min={20} max={80} suffix=" %" />
-              <Slider label="Taux de présence au RDV" value={presence} set={setPresence} min={50} max={95} suffix=" %" />
-              <Slider label="Taux RDV → appareillage" value={closing} set={setClosing} min={10} max={60} suffix=" %" />
+              <Slider label="Coût par lead (CPL)" value={cpl} set={A(setCpl)} min={4} max={40} suffix=" €" />
+              <Slider label="Taux lead → RDV" value={leadToRdv} set={A(setLeadToRdv)} min={15} max={80} suffix=" %" />
+              <Slider label="Taux de présence au RDV" value={presence} set={A(setPresence)} min={50} max={95} suffix=" %" />
+              <Slider label="Taux RDV → appareillage" value={closing} set={A(setClosing)} min={10} max={60} suffix=" %" />
               <Slider label="Marge moyenne / appareillage" value={marge} set={setMarge} min={400} max={3000} step={50} suffix=" €" />
               <Slider label="Tes honoraires / mois" value={fee} set={setFee} min={300} max={3000} step={10} suffix=" €" />
             </div>
@@ -180,7 +226,8 @@ export default function AdPlanner() {
           </div>
 
           <p className="text-xs text-mut">
-            Chiffres indicatifs basés sur des moyennes du secteur — ajuste les hypothèses selon la zone et le centre.
+            Chiffres indicatifs (Meta = leads en amont, plus froids que Google). Les 2-3 premiers mois sont une phase d'apprentissage.
+            Ne garantis jamais un nombre de RDV : engage-toi sur le budget bien géré et le reporting.
           </p>
         </div>
       </div>
