@@ -30,7 +30,8 @@ export default async function Dashboard() {
 
   const total = prospects.length;
   const chauds = prospects.filter((p) => p.interet === "chaud").length;
-  const aAppeler = prospects.filter((p) => p.statut === "a_appeler").length;
+  const contactedSet = new Set(calls.map((c) => c.prospect_id));
+  const aAppeler = prospects.filter((p) => !contactedSet.has(p.id)).length;
 
   const rappels = calls
     .filter((c) => c.rappel_at && new Date(c.rappel_at) <= endToday)

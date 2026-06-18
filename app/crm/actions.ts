@@ -10,12 +10,26 @@ function assertAuth() {
   if (!isAuthed()) throw new Error("Non autorisé");
 }
 
+function parseTags(v: FormDataEntryValue | null): string[] {
+  return String(v || "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
+function revalidateCrm(prospectId?: string) {
+  revalidatePath("/crm");
+  revalidatePath("/crm/prospects");
+  revalidatePath("/crm/journal");
+  if (prospectId) revalidatePath(`/crm/prospect/${prospectId}`);
+}
+
 export async function logout() {
   cookies().delete(AUTH_COOKIE);
   redirect("/crm/login");
 }
 
-// Met à jour des champs d'un prospect (statut, intérêt, notes, coordonnées…).
+// Coordonnées / contexte d'un prospect (tel, email, ville, dept, notes)
 export async function updateProspect(formData: FormData) {
   assertAuth();
   const id = String(formData.get("id"));
@@ -25,20 +39,14 @@ export async function updateProspect(formData: FormData) {
     if (v !== null) patch[f] = String(v) === "" ? null : String(v);
   }
   const tagsRaw = formData.get("tags");
-  if (tagsRaw !== null) {
-    patch.tags = String(tagsRaw)
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
-  }
+  if (tagsRaw !== null) patch.tags = parseTags(tagsRaw);
   const db = getDb();
   await db.from("neela_prospects").update(patch).eq("id", id);
-  revalidatePath(`/crm/prospect/${id}`);
-  revalidatePath("/crm");
-  revalidatePath("/crm/prospects");
+  revalidateCrm(id);
 }
 
-// Enregistre un appel sur la fiche (+ tags + audio) et reporte le statut/intérêt.
+// Enregistre une interaction : crée un appel ET met à jour le prospect (statut, intérêt, tags)
+// => le prospect bascule automatiquement dans le Journal (il a désormais une interaction).
 export async function addCall(formData: FormData) {
   assertAuth();
   const prospectId = String(formData.get("prospect_id"));
@@ -48,23 +56,20 @@ export async function addCall(formData: FormData) {
   const interet = String(formData.get("interet") || "");
   const rappelRaw = String(formData.get("rappel_at") || "");
   const rappel_at = rappelRaw ? new Date(rappelRaw).toISOString() : null;
-
-  const tags = String(formData.get("tags") || "")
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean);
+  const tags = parseTags(formData.get("tags"));
 
   const db = getDb();
 
-  // Upload de l'enregistrement audio s'il y en a un
   let recording_path: string | null = null;
   const audio = formData.get("audio");
   if (audio && audio instanceof File && audio.size > 0) {
+    const type = audio.type || "audio/webm";
+    const ext = type.includes("mp4") || type.includes("aac") || type.includes("m4a") ? "m4a" : "webm";
     const buf = Buffer.from(await audio.arrayBuffer());
-    const path = `${prospectId}/${Date.now()}.webm`;
+    const path = `${prospectId}/${Date.now()}.${ext}`;
     const { error } = await db.storage
       .from("neela-recordings")
-      .upload(path, buf, { contentType: audio.type || "audio/webm", upsert: false });
+      .upload(path, buf, { contentType: type, upsert: true });
     if (!error) recording_path = path;
   }
 
@@ -79,24 +84,21 @@ export async function addCall(formData: FormData) {
     recording_path,
   });
 
-  // Reporter sur le prospect ce qui a changé
   const patch: Record<string, unknown> = {};
   if (statut) patch.statut = statut;
   if (interet) patch.interet = interet;
+  if (tags.length) patch.tags = tags;
   if (Object.keys(patch).length) {
     await db.from("neela_prospects").update(patch).eq("id", prospectId);
   }
 
-  revalidatePath(`/crm/prospect/${prospectId}`);
-  revalidatePath("/crm");
-  revalidatePath("/crm/prospects");
-  revalidatePath("/crm/journal");
+  revalidateCrm(prospectId);
 }
 
-// Crée un nouveau prospect puis ouvre sa fiche.
+// Crée un nouveau prospect puis ouvre sa fiche
 export async function addProspect(formData: FormData) {
   assertAuth();
-  const row: Record<string, unknown> = {
+  const row = {
     nom: String(formData.get("nom") || "") || null,
     centre: String(formData.get("centre") || "") || null,
     ville: String(formData.get("ville") || "") || null,
@@ -109,18 +111,14 @@ export async function addProspect(formData: FormData) {
     statut: "a_appeler",
   };
   const db = getDb();
-  const { data } = await db
-    .from("neela_prospects")
-    .insert(row)
-    .select("id")
-    .single();
+  const { data } = await db.from("neela_prospects").insert(row).select("id").single();
   revalidatePath("/crm");
   revalidatePath("/crm/prospects");
   if (data?.id) redirect(`/crm/prospect/${data.id}`);
   redirect("/crm/prospects");
 }
 
-// Crée un rendez-vous (agenda).
+// Rendez-vous (agenda)
 export async function addAppointment(formData: FormData) {
   assertAuth();
   const startRaw = String(formData.get("start_at") || "");
@@ -141,7 +139,17 @@ export async function addAppointment(formData: FormData) {
   revalidatePath("/crm");
 }
 
-// Import d'un appel depuis l'ancien CRM (relié au prospect par son nom).
+export async function updateAppointmentStatus(formData: FormData) {
+  assertAuth();
+  const id = String(formData.get("id"));
+  const status = String(formData.get("status") || "reserve");
+  const db = getDb();
+  await db.from("neela_appointments").update({ status }).eq("id", id);
+  revalidatePath("/crm/agenda");
+  revalidatePath("/crm");
+}
+
+// Import d'un appel depuis l'ancien CRM (relié au prospect par son nom)
 export async function importCall(formData: FormData) {
   assertAuth();
   const nom = String(formData.get("nom") || "").trim();
@@ -152,7 +160,7 @@ export async function importCall(formData: FormData) {
   const atRaw = String(formData.get("at") || "");
   const rappelRaw = String(formData.get("rappelAt") || "");
 
-  const parseDate = (v: string) => {
+  const parseDate = (v: string): string | null => {
     if (!v) return null;
     const n = Number(v);
     const d = new Date(isNaN(n) ? v : n);
@@ -162,13 +170,7 @@ export async function importCall(formData: FormData) {
   const rappel_at = parseDate(rappelRaw);
 
   const db = getDb();
-
-  // Retrouver le prospect par son nom (sinon le créer)
-  const { data: found } = await db
-    .from("neela_prospects")
-    .select("id")
-    .ilike("nom", nom)
-    .limit(1);
+  const { data: found } = await db.from("neela_prospects").select("id").ilike("nom", nom).limit(1);
   let prospectId = found?.[0]?.id as string | undefined;
   if (!prospectId) {
     const { data: created } = await db
@@ -180,7 +182,6 @@ export async function importCall(formData: FormData) {
   }
   if (!prospectId) return { ok: false, reason: "no-prospect" };
 
-  // Éviter les doublons si l'import est relancé
   const { data: dup } = await db
     .from("neela_calls")
     .select("id")
@@ -189,7 +190,6 @@ export async function importCall(formData: FormData) {
     .limit(1);
   if (dup && dup.length) return { ok: true, dup: true };
 
-  // Upload de l'audio s'il y en a un
   let recording_path: string | null = null;
   const audio = formData.get("audio");
   if (audio && audio instanceof File && audio.size > 0) {
@@ -211,19 +211,6 @@ export async function importCall(formData: FormData) {
     tags: [],
   });
 
-  revalidatePath("/crm");
-  revalidatePath("/crm/journal");
-  revalidatePath(`/crm/prospect/${prospectId}`);
+  revalidateCrm(prospectId);
   return { ok: true };
-}
-
-// Met à jour le statut d'un rendez-vous (honoré / annulé / no-show).
-export async function updateAppointmentStatus(formData: FormData) {
-  assertAuth();
-  const id = String(formData.get("id"));
-  const status = String(formData.get("status") || "reserve");
-  const db = getDb();
-  await db.from("neela_appointments").update({ status }).eq("id", id);
-  revalidatePath("/crm/agenda");
-  revalidatePath("/crm");
 }
