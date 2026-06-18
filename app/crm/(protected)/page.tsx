@@ -39,10 +39,10 @@ export default async function Dashboard() {
     .slice(0, 8);
 
   const prochainsRdv = appts
-    .filter((a) => a.status === "reserve" && new Date(a.start_at) >= new Date(now.toDateString()))
+    .filter((a) => a.status === "reserve" && a.source !== "rappel" && new Date(a.start_at) >= new Date(now.toDateString()))
     .slice(0, 6);
   const rdvAvenir = appts.filter(
-    (a) => a.status === "reserve" && new Date(a.start_at) >= now
+    (a) => a.status === "reserve" && a.source !== "rappel" && new Date(a.start_at) >= now
   ).length;
 
   const maxStatut = Math.max(

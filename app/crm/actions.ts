@@ -92,6 +92,19 @@ export async function addCall(formData: FormData) {
     await db.from("neela_prospects").update(patch).eq("id", prospectId);
   }
 
+  // Rappel / RDV programmé => on le pose directement dans l'agenda
+  if (rappel_at) {
+    const { data: pr } = await db.from("neela_prospects").select("nom").eq("id", prospectId).single();
+    await db.from("neela_appointments").insert({
+      prospect_id: prospectId,
+      start_at: rappel_at,
+      name: pr?.nom ?? null,
+      status: "reserve",
+      source: "rappel",
+    });
+    revalidatePath("/crm/agenda");
+  }
+
   revalidateCrm(prospectId);
 }
 
