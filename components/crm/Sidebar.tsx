@@ -7,6 +7,7 @@ import {
   Users,
   CalendarDays,
   PhoneCall,
+  Calculator,
   LogOut,
 } from "lucide-react";
 import { logout } from "@/app/crm/actions";
@@ -16,6 +17,7 @@ const NAV = [
   { href: "/crm/prospects", label: "Prospects", icon: Users, match: (p: string) => p.startsWith("/crm/prospect") },
   { href: "/crm/agenda", label: "Agenda", icon: CalendarDays, match: (p: string) => p.startsWith("/crm/agenda") },
   { href: "/crm/journal", label: "Journal", icon: PhoneCall, match: (p: string) => p.startsWith("/crm/journal") },
+  { href: "/crm/ad-planner", label: "Ad Planner", icon: Calculator, match: (p: string) => p.startsWith("/crm/ad-planner") },
 ];
 
 export default function Sidebar() {
