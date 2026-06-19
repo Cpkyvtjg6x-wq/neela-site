@@ -8,6 +8,7 @@ import {
   CalendarDays,
   PhoneCall,
   Calculator,
+  Upload,
   LogOut,
 } from "lucide-react";
 import { logout } from "@/app/crm/actions";
@@ -18,6 +19,7 @@ const NAV = [
   { href: "/crm/agenda", label: "Agenda", icon: CalendarDays, match: (p: string) => p.startsWith("/crm/agenda") },
   { href: "/crm/journal", label: "Journal", icon: PhoneCall, match: (p: string) => p.startsWith("/crm/journal") },
   { href: "/crm/ad-planner", label: "Ad Planner", icon: Calculator, match: (p: string) => p.startsWith("/crm/ad-planner") },
+  { href: "/crm/import", label: "Import", icon: Upload, match: (p: string) => p.startsWith("/crm/import") },
 ];
 
 export default function Sidebar() {

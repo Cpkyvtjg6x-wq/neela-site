@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X } from "lucide-react";
+import { updateAppointmentStatus } from "@/app/crm/actions";
 
 export type CalEvent = {
   id: string;
@@ -123,7 +124,7 @@ export default function Calendar({ events }: { events: CalEvent[] }) {
               >
                 <span className={isSel ? "font-bold" : ""}>{day}</span>
                 {evs.length > 0 && (
-                  <span className="mt-0.5 flex gap-0.5">
+                  <span className="mt-0.5 flex items-center gap-0.5">
                     {evs.slice(0, 3).map((e, k) => (
                       <span
                         key={k}
@@ -136,6 +137,11 @@ export default function Calendar({ events }: { events: CalEvent[] }) {
                         }`}
                       />
                     ))}
+                    {evs.length > 3 && (
+                      <span className={`text-[8px] font-bold leading-none ${isSel ? "text-white" : "text-mut"}`}>
+                        +{evs.length - 3}
+                      </span>
+                    )}
                   </span>
                 )}
               </button>
@@ -166,28 +172,45 @@ export default function Calendar({ events }: { events: CalEvent[] }) {
         ) : (
           <ul className="space-y-2">
             {selectedEvents.map((e) => {
-              const inner = (
-                <div className="flex items-center gap-3 rounded-xl bg-paper px-3 py-2.5">
+              const time = new Date(e.date).toLocaleTimeString("fr-FR", {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "Europe/Paris",
+              });
+              return (
+                <li key={e.id} className="flex items-center gap-2 rounded-xl bg-paper px-3 py-2.5">
                   <span
                     className={`h-2.5 w-2.5 shrink-0 rounded-full ${
                       e.type === "rdv" ? "bg-emerald-500" : "bg-amber-500"
                     }`}
                   />
-                  <span className="w-12 shrink-0 text-xs font-semibold text-mut">
-                    {new Date(e.date).toLocaleTimeString("fr-FR", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      timeZone: "Europe/Paris",
-                    })}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                    {e.title}
-                  </span>
-                </div>
-              );
-              return (
-                <li key={e.id}>
-                  {e.href ? <Link href={e.href}>{inner}</Link> : inner}
+                  <span className="w-12 shrink-0 text-xs font-semibold text-mut">{time}</span>
+                  {e.href ? (
+                    <Link href={e.href} className="min-w-0 flex-1 truncate text-sm font-medium hover:text-accent">
+                      {e.title}
+                    </Link>
+                  ) : (
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{e.title}</span>
+                  )}
+                  <form action={updateAppointmentStatus} className="flex shrink-0 gap-1">
+                    <input type="hidden" name="id" value={e.id} />
+                    <button
+                      name="status"
+                      value="honore"
+                      title={e.type === "rdv" ? "Marquer honoré" : "Marquer fait"}
+                      className="rounded-md border border-line p-1 text-emerald-600 hover:bg-emerald-50"
+                    >
+                      <Check size={13} />
+                    </button>
+                    <button
+                      name="status"
+                      value="annule"
+                      title="Annuler"
+                      className="rounded-md border border-line p-1 text-red-600 hover:bg-red-50"
+                    >
+                      <X size={13} />
+                    </button>
+                  </form>
                 </li>
               );
             })}

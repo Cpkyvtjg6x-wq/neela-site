@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Prospect } from "@/lib/crm";
-import { statutLabel, interetMeta, regionForDept, REGIONS } from "@/lib/crm";
+import { statutLabel, interetMeta, regionForDept, REGIONS, STATUTS, INTERETS } from "@/lib/crm";
 
 export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
   const [q, setQ] = useState("");
@@ -80,18 +80,15 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
         </select>
         <select value={interet} onChange={(e) => setInteret(e.target.value)} className={inputCls}>
           <option value="">Intérêt</option>
-          <option value="chaud">Chaud</option>
-          <option value="tiede">Tiède</option>
-          <option value="froid">Froid</option>
+          {INTERETS.map((s) => (
+            <option key={s.key} value={s.key}>{s.label}</option>
+          ))}
         </select>
         <select value={statut} onChange={(e) => setStatut(e.target.value)} className={inputCls}>
           <option value="">Statut</option>
-          <option value="a_appeler">À appeler</option>
-          <option value="a_rappeler">À rappeler</option>
-          <option value="r1_pose">R1 posé</option>
-          <option value="proposition">Proposition</option>
-          <option value="signe">Signé</option>
-          <option value="pas_interesse">Pas intéressé</option>
+          {STATUTS.map((s) => (
+            <option key={s.key} value={s.key}>{s.label}</option>
+          ))}
         </select>
         <select
           value={groupBy}

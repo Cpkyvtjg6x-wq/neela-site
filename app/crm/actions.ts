@@ -17,6 +17,11 @@ function parseTags(v: FormDataEntryValue | null): string[] {
     .filter(Boolean);
 }
 
+// Département français : 2 chiffres (métropole) ou 3 (DOM, ex. 971).
+function validDept(v: string): boolean {
+  return /^\d{2,3}$/.test(v);
+}
+
 // Une saisie <input type="datetime-local"> est une heure « murale » sans fuseau.
 // Le serveur (Vercel) tourne en UTC : sans conversion, « 14h30 » serait pris pour 14h30 UTC
 // puis réaffiché en heure de Paris (+2h l'été). On interprète donc la saisie comme Europe/Paris.
@@ -60,8 +65,12 @@ export async function updateProspect(formData: FormData) {
   }
   const tagsRaw = formData.get("tags");
   if (tagsRaw !== null) patch.tags = parseTags(tagsRaw);
+  if (typeof patch.departement === "string" && !validDept(patch.departement)) {
+    throw new Error("Département invalide : indique 2 ou 3 chiffres (ex. 34, 971).");
+  }
   const db = getDb();
-  await db.from("neela_prospects").update(patch).eq("id", id);
+  const { error } = await db.from("neela_prospects").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
   revalidateCrm(id);
 }
 
@@ -93,7 +102,7 @@ export async function addCall(formData: FormData) {
     if (!error) recording_path = path;
   }
 
-  await db.from("neela_calls").insert({
+  const { error: callErr } = await db.from("neela_calls").insert({
     prospect_id: prospectId,
     outcome: outcome || null,
     notes: notes || null,
@@ -103,13 +112,15 @@ export async function addCall(formData: FormData) {
     tags,
     recording_path,
   });
+  if (callErr) throw new Error(callErr.message);
 
   const patch: Record<string, unknown> = {};
   if (statut) patch.statut = statut;
   if (interet) patch.interet = interet;
   if (tags.length) patch.tags = tags;
   if (Object.keys(patch).length) {
-    await db.from("neela_prospects").update(patch).eq("id", prospectId);
+    const { error: upErr } = await db.from("neela_prospects").update(patch).eq("id", prospectId);
+    if (upErr) throw new Error(upErr.message);
   }
 
   // Rappel / RDV programmé => on le pose directement dans l'agenda
@@ -117,13 +128,14 @@ export async function addCall(formData: FormData) {
     const { data: pr } = await db.from("neela_prospects").select("nom").eq("id", prospectId).single();
     // On remplace l'éventuel rappel d'agenda existant de ce prospect (évite les doublons).
     await db.from("neela_appointments").delete().eq("prospect_id", prospectId).eq("source", "rappel");
-    await db.from("neela_appointments").insert({
+    const { error: apptErr } = await db.from("neela_appointments").insert({
       prospect_id: prospectId,
       start_at: rappel_at,
       name: pr?.nom ?? null,
       status: "reserve",
       source: "rappel",
     });
+    if (apptErr) throw new Error(apptErr.message);
     revalidatePath("/crm/agenda");
   }
 
@@ -131,13 +143,27 @@ export async function addCall(formData: FormData) {
 }
 
 // Crée un nouveau prospect puis ouvre sa fiche
-export async function addProspect(formData: FormData) {
+export async function addProspect(
+  formData: FormData
+): Promise<{ ok: boolean; id?: string; error?: string }> {
   assertAuth();
+  const nom = String(formData.get("nom") || "").trim();
+  if (!nom) return { ok: false, error: "Le nom est obligatoire." };
+  const departement = String(formData.get("departement") || "").trim();
+  if (departement && !validDept(departement)) {
+    return { ok: false, error: "Département invalide : indique 2 ou 3 chiffres (ex. 34, 971)." };
+  }
+  const db = getDb();
+  // Anti-doublon : un prospect du même nom existe-t-il déjà ?
+  const { data: existing } = await db.from("neela_prospects").select("id").ilike("nom", nom).limit(1);
+  if (existing && existing.length) {
+    return { ok: false, error: `Un prospect nommé « ${nom} » existe déjà. Ouvre sa fiche ou choisis un autre nom.` };
+  }
   const row = {
-    nom: String(formData.get("nom") || "") || null,
+    nom,
     centre: String(formData.get("centre") || "") || null,
     ville: String(formData.get("ville") || "") || null,
-    departement: String(formData.get("departement") || "") || null,
+    departement: departement || null,
     telephone: String(formData.get("telephone") || "") || null,
     email: String(formData.get("email") || "") || null,
     interet: String(formData.get("interet") || "") || null,
@@ -145,12 +171,11 @@ export async function addProspect(formData: FormData) {
     source: "sortant",
     statut: "a_appeler",
   };
-  const db = getDb();
-  const { data } = await db.from("neela_prospects").insert(row).select("id").single();
+  const { data, error } = await db.from("neela_prospects").insert(row).select("id").single();
+  if (error) return { ok: false, error: error.message };
   revalidatePath("/crm");
   revalidatePath("/crm/prospects");
-  if (data?.id) redirect(`/crm/prospect/${data.id}`);
-  redirect("/crm/prospects");
+  return { ok: true, id: data?.id };
 }
 
 // Rendez-vous (agenda)
@@ -161,8 +186,8 @@ export async function addAppointment(formData: FormData) {
   const prospectId = String(formData.get("prospect_id") || "") || null;
   const db = getDb();
   const start_at = localParisToISO(startRaw);
-  if (!start_at) return;
-  await db.from("neela_appointments").insert({
+  if (!start_at) throw new Error("Date/heure du rendez-vous invalide.");
+  const { error } = await db.from("neela_appointments").insert({
     start_at,
     name: String(formData.get("name") || "") || null,
     phone: String(formData.get("phone") || "") || null,
@@ -172,6 +197,7 @@ export async function addAppointment(formData: FormData) {
     status: "reserve",
     source: "manuel",
   });
+  if (error) throw new Error(error.message);
   revalidatePath("/crm/agenda");
   revalidatePath("/crm");
 }
@@ -181,9 +207,26 @@ export async function updateAppointmentStatus(formData: FormData) {
   const id = String(formData.get("id"));
   const status = String(formData.get("status") || "reserve");
   const db = getDb();
-  await db.from("neela_appointments").update({ status }).eq("id", id);
+  const { error } = await db.from("neela_appointments").update({ status }).eq("id", id);
+  if (error) throw new Error(error.message);
   revalidatePath("/crm/agenda");
   revalidatePath("/crm");
+}
+
+// Marque un rappel comme traité : efface la date de rappel de l'appel
+// et retire l'éventuel rendez-vous « rappel » de l'agenda pour ce prospect.
+export async function clearRappel(formData: FormData) {
+  assertAuth();
+  const callId = String(formData.get("call_id"));
+  const prospectId = String(formData.get("prospect_id") || "");
+  const db = getDb();
+  const { error } = await db.from("neela_calls").update({ rappel_at: null }).eq("id", callId);
+  if (error) throw new Error(error.message);
+  if (prospectId) {
+    await db.from("neela_appointments").delete().eq("prospect_id", prospectId).eq("source", "rappel");
+  }
+  revalidateCrm(prospectId || undefined);
+  revalidatePath("/crm/agenda");
 }
 
 // Import d'un appel depuis l'ancien CRM (relié au prospect par son nom)

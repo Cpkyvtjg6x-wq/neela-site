@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Flame, PhoneOutgoing, CalendarClock, Users, Plus } from "lucide-react";
+import { Flame, PhoneOutgoing, CalendarClock, Users, Plus, Check } from "lucide-react";
 import { getAllProspects, getAllCalls, getAppointments, indexProspects } from "@/lib/crmData";
 import { STATUTS, statutLabel, regionForDept } from "@/lib/crm";
+import { clearRappel } from "@/app/crm/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -106,23 +107,34 @@ export default async function Dashboard() {
                 const p = map.get(c.prospect_id);
                 const overdue = new Date(c.rappel_at!) < now;
                 return (
-                  <li key={c.id}>
+                  <li key={c.id} className="flex items-center gap-2 rounded-xl px-3 py-2 hover:bg-paper">
+                    <span
+                      className={`h-2 w-2 shrink-0 rounded-full ${overdue ? "bg-red-500" : "bg-amber-500"}`}
+                    />
                     <Link
                       href={p ? `/crm/prospect/${p.id}` : "/crm"}
-                      className="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-paper"
+                      className="min-w-0 flex-1 truncate text-sm font-medium hover:text-accent"
                     >
-                      <span
-                        className={`h-2 w-2 shrink-0 rounded-full ${
-                          overdue ? "bg-red-500" : "bg-amber-500"
-                        }`}
-                      />
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                        {p?.nom ?? "Prospect"}
-                      </span>
-                      <span className={`text-xs ${overdue ? "text-red-600" : "text-mut"}`}>
-                        {fmtDate(c.rappel_at!)}
-                      </span>
+                      {p?.nom ?? "Prospect"}
                     </Link>
+                    {overdue && (
+                      <span className="shrink-0 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-600">
+                        en retard
+                      </span>
+                    )}
+                    <span className={`shrink-0 text-xs ${overdue ? "text-red-600" : "text-mut"}`}>
+                      {fmtDate(c.rappel_at!)}
+                    </span>
+                    <form action={clearRappel} className="shrink-0">
+                      <input type="hidden" name="call_id" value={c.id} />
+                      <input type="hidden" name="prospect_id" value={c.prospect_id} />
+                      <button
+                        title="Marquer ce rappel comme traité"
+                        className="rounded-md border border-line p-1 text-emerald-600 hover:bg-emerald-50"
+                      >
+                        <Check size={13} />
+                      </button>
+                    </form>
                   </li>
                 );
               })}

@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/lib/supabaseAdmin";
 import type { Prospect, Call } from "@/lib/crm";
 import { outcomeLabel, interetMeta, regionForDept, statutLabel } from "@/lib/crm";
-import { updateProspect } from "@/app/crm/actions";
 import InteractionForm from "@/components/crm/InteractionForm";
+import ProspectInfoForm from "@/components/crm/ProspectInfoForm";
 import Tag from "@/components/crm/Tag";
 
 export const dynamic = "force-dynamic";
@@ -37,8 +37,6 @@ export default async function ProspectPage({ params }: { params: { id: string } 
   const urlMap = new Map(signed);
 
   const im = interetMeta(p.interet);
-  const field = "w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent";
-  const label = "text-xs font-semibold uppercase tracking-wide text-mut";
 
   return (
     <div>
@@ -78,38 +76,10 @@ export default async function ProspectPage({ params }: { params: { id: string } 
       <div className="mt-7 grid gap-6 lg:grid-cols-[1.05fr_1fr]">
         {/* Colonne gauche : le bloc unique d'interaction + coordonnées */}
         <div className="space-y-6">
-          <InteractionForm prospectId={p.id} />
+          <InteractionForm prospectId={p.id} defaultStatut={p.statut ?? ""} defaultInteret={p.interet ?? ""} />
 
-          {/* Coordonnées & contexte (factuel, change rarement) */}
-          <form action={updateProspect} className="rounded-2xl border border-line bg-white p-5">
-            <input type="hidden" name="id" value={p.id} />
-            <h2 className="mb-4 font-display text-base font-bold">Coordonnées &amp; contexte</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <p className={label}>Téléphone</p>
-                <input name="telephone" defaultValue={p.telephone ?? ""} className={field} />
-              </div>
-              <div>
-                <p className={label}>Email</p>
-                <input name="email" defaultValue={p.email ?? ""} className={field} />
-              </div>
-              <div>
-                <p className={label}>Ville</p>
-                <input name="ville" defaultValue={p.ville ?? ""} className={field} />
-              </div>
-              <div>
-                <p className={label}>Département</p>
-                <input name="departement" defaultValue={p.departement ?? ""} maxLength={3} className={field} />
-              </div>
-            </div>
-            <div className="mt-3">
-              <p className={label}>Notes / contexte</p>
-              <textarea name="notes" defaultValue={p.notes ?? ""} rows={4} className={field} />
-            </div>
-            <button type="submit" className="mt-4 rounded-xl border border-line px-5 py-2.5 text-sm font-semibold hover:border-ink">
-              Enregistrer les coordonnées
-            </button>
-          </form>
+          {/* Fiche & coordonnées — tout est corrigeable ici */}
+          <ProspectInfoForm p={p} />
         </div>
 
         {/* Colonne droite : historique */}
