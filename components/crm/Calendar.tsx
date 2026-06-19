@@ -177,6 +177,7 @@ export default function Calendar({ events }: { events: CalEvent[] }) {
                     {new Date(e.date).toLocaleTimeString("fr-FR", {
                       hour: "2-digit",
                       minute: "2-digit",
+                      timeZone: "Europe/Paris",
                     })}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">

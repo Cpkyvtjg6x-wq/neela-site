@@ -10,10 +10,11 @@ function fmtDate(d: string) {
     weekday: "short",
     day: "2-digit",
     month: "short",
+    timeZone: "Europe/Paris",
   });
 }
 function fmtTime(d: string) {
-  return new Date(d).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return new Date(d).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
 }
 
 export default async function Dashboard() {

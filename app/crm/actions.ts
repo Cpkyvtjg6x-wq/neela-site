@@ -17,6 +17,26 @@ function parseTags(v: FormDataEntryValue | null): string[] {
     .filter(Boolean);
 }
 
+// Une saisie <input type="datetime-local"> est une heure « murale » sans fuseau.
+// Le serveur (Vercel) tourne en UTC : sans conversion, « 14h30 » serait pris pour 14h30 UTC
+// puis réaffiché en heure de Paris (+2h l'été). On interprète donc la saisie comme Europe/Paris.
+function localParisToISO(naive: string): string | null {
+  if (!naive) return null;
+  const asUTC = new Date((naive.length === 16 ? naive + ":00" : naive) + "Z");
+  if (isNaN(asUTC.getTime())) return null;
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Paris", hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+  const p: Record<string, string> = {};
+  for (const part of dtf.formatToParts(asUTC)) p[part.type] = part.value;
+  const h = p.hour === "24" ? "00" : p.hour;
+  const parisAsUTC = Date.UTC(+p.year, +p.month - 1, +p.day, +h, +p.minute, +p.second);
+  const offsetMs = parisAsUTC - asUTC.getTime();
+  return new Date(asUTC.getTime() - offsetMs).toISOString();
+}
+
 function revalidateCrm(prospectId?: string) {
   revalidatePath("/crm");
   revalidatePath("/crm/prospects");
@@ -55,7 +75,7 @@ export async function addCall(formData: FormData) {
   const statut = String(formData.get("statut") || "");
   const interet = String(formData.get("interet") || "");
   const rappelRaw = String(formData.get("rappel_at") || "");
-  const rappel_at = rappelRaw ? new Date(rappelRaw).toISOString() : null;
+  const rappel_at = localParisToISO(rappelRaw);
   const tags = parseTags(formData.get("tags"));
 
   const db = getDb();
@@ -95,6 +115,8 @@ export async function addCall(formData: FormData) {
   // Rappel / RDV programmé => on le pose directement dans l'agenda
   if (rappel_at) {
     const { data: pr } = await db.from("neela_prospects").select("nom").eq("id", prospectId).single();
+    // On remplace l'éventuel rappel d'agenda existant de ce prospect (évite les doublons).
+    await db.from("neela_appointments").delete().eq("prospect_id", prospectId).eq("source", "rappel");
     await db.from("neela_appointments").insert({
       prospect_id: prospectId,
       start_at: rappel_at,
@@ -138,8 +160,10 @@ export async function addAppointment(formData: FormData) {
   if (!startRaw) return;
   const prospectId = String(formData.get("prospect_id") || "") || null;
   const db = getDb();
+  const start_at = localParisToISO(startRaw);
+  if (!start_at) return;
   await db.from("neela_appointments").insert({
-    start_at: new Date(startRaw).toISOString(),
+    start_at,
     name: String(formData.get("name") || "") || null,
     phone: String(formData.get("phone") || "") || null,
     email: String(formData.get("email") || "") || null,

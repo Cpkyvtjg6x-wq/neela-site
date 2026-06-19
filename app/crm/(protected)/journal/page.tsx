@@ -8,7 +8,7 @@ import Tag from "@/components/crm/Tag";
 export const dynamic = "force-dynamic";
 
 function dayKey(d: string) {
-  return new Date(d).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  return new Date(d).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" });
 }
 
 export default async function JournalPage() {
