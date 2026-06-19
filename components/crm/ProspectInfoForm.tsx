@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { STATUTS, INTERETS } from "@/lib/crm";
 import type { Prospect } from "@/lib/crm";
 import { updateProspect } from "@/app/crm/actions";
 
@@ -42,23 +41,6 @@ export default function ProspectInfoForm({ p }: { p: Prospect }) {
         <div>
           <p className={label}>Enseigne / réseau</p>
           <input name="centre" defaultValue={p.centre ?? ""} className={field} />
-        </div>
-        <div>
-          <p className={label}>Statut</p>
-          <select name="statut" defaultValue={p.statut ?? STATUTS[0].key} className={field}>
-            {STATUTS.map((s) => (
-              <option key={s.key} value={s.key}>{s.label}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <p className={label}>Intérêt</p>
-          <select name="interet" defaultValue={p.interet ?? ""} className={field}>
-            <option value="">(non défini)</option>
-            {INTERETS.map((s) => (
-              <option key={s.key} value={s.key}>{s.label}</option>
-            ))}
-          </select>
         </div>
         <div>
           <p className={label}>Téléphone</p>

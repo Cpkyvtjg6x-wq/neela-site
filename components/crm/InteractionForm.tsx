@@ -11,15 +11,18 @@ export default function InteractionForm({
   prospectId,
   defaultStatut,
   defaultInteret,
+  onSaved,
 }: {
   prospectId: string;
   defaultStatut?: string;
   defaultInteret?: string;
+  onSaved?: () => void;
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, startTransition] = useTransition();
   const [outcome, setOutcome] = useState("");
+  const [rappelType, setRappelType] = useState<"rappel" | "r1">("rappel");
   const [tagKey, setTagKey] = useState(0);
   const [err, setErr] = useState<string | null>(null);
 
@@ -98,6 +101,7 @@ export default function InteractionForm({
     const fd = new FormData(e.currentTarget);
     fd.set("prospect_id", prospectId);
     fd.set("outcome", outcome);
+    fd.set("rappel_type", rappelType);
     if (blob) {
       const ext = blob.type.includes("mp4") || blob.type.includes("m4a") ? "m4a" : "webm";
       fd.append("audio", blob, `appel.${ext}`);
@@ -107,9 +111,11 @@ export default function InteractionForm({
         await addCall(fd);
         formRef.current?.reset();
         setOutcome("");
+        setRappelType("rappel");
         setTagKey((k) => k + 1);
         clearRec();
         router.refresh();
+        onSaved?.();
       } catch {
         setErr(
           "Erreur lors de l'enregistrement. Si l'audio est très long, réessaie sans l'enregistrement."
@@ -184,6 +190,27 @@ export default function InteractionForm({
       <div className="mt-3">
         <p className={label}>Rendez-vous / rappel</p>
         <input type="datetime-local" name="rappel_at" className={field} />
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setRappelType("rappel")}
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              rappelType === "rappel" ? "bg-amber-500 text-white" : "border border-line text-mut hover:border-ink"
+            }`}
+          >
+            ● Rappel simple
+          </button>
+          <button
+            type="button"
+            onClick={() => setRappelType("r1")}
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              rappelType === "r1" ? "bg-emerald-600 text-white" : "border border-line text-mut hover:border-ink"
+            }`}
+          >
+            ● RDV (R1)
+          </button>
+        </div>
+        <p className="mt-1 text-[11px] text-mut">Le rappel apparaît dans l'agenda — orange (rappel) ou vert (R1).</p>
       </div>
 
       {/* Enregistrement audio */}

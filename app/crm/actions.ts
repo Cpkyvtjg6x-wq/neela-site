@@ -54,6 +54,26 @@ export async function logout() {
   redirect("/crm/login");
 }
 
+// Détail d'un prospect (fiche) : prospect + appels + URLs audio signées.
+// Utilisé par la modale de fiche côté client.
+export async function getProspectDetail(id: string) {
+  assertAuth();
+  const db = getDb();
+  const { data: prospect } = await db.from("neela_prospects").select("*").eq("id", id).single();
+  if (!prospect) return null;
+  const { data: callsData } = await db
+    .from("neela_calls").select("*").eq("prospect_id", id).order("created_at", { ascending: false });
+  const calls = callsData ?? [];
+  const audio: Record<string, string> = {};
+  for (const c of calls) {
+    if (c.recording_path) {
+      const { data } = await db.storage.from("neela-recordings").createSignedUrl(c.recording_path, 3600);
+      if (data?.signedUrl) audio[c.id] = data.signedUrl;
+    }
+  }
+  return { prospect, calls, audio };
+}
+
 // Coordonnées / contexte d'un prospect (tel, email, ville, dept, notes)
 export async function updateProspect(formData: FormData) {
   assertAuth();
@@ -125,15 +145,16 @@ export async function addCall(formData: FormData) {
 
   // Rappel / RDV programmé => on le pose directement dans l'agenda
   if (rappel_at) {
+    const rtype = String(formData.get("rappel_type") || "rappel") === "r1" ? "r1" : "rappel";
     const { data: pr } = await db.from("neela_prospects").select("nom").eq("id", prospectId).single();
-    // On remplace l'éventuel rappel d'agenda existant de ce prospect (évite les doublons).
-    await db.from("neela_appointments").delete().eq("prospect_id", prospectId).eq("source", "rappel");
+    // On remplace l'éventuel rappel/RDV d'agenda existant de ce prospect (évite les doublons).
+    await db.from("neela_appointments").delete().eq("prospect_id", prospectId).in("source", ["rappel", "r1"]);
     const { error: apptErr } = await db.from("neela_appointments").insert({
       prospect_id: prospectId,
       start_at: rappel_at,
       name: pr?.nom ?? null,
       status: "reserve",
-      source: "rappel",
+      source: rtype,
     });
     if (apptErr) throw new Error(apptErr.message);
     revalidatePath("/crm/agenda");

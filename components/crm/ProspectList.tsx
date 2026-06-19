@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import type { Prospect } from "@/lib/crm";
 import { statutLabel, interetMeta, regionForDept, REGIONS, STATUTS, INTERETS, prospectScore, scoreTier } from "@/lib/crm";
+import { useFiche } from "./FicheModal";
 
 export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
+  const { open } = useFiche();
   const [q, setQ] = useState("");
   const [dept, setDept] = useState("");
   const [region, setRegion] = useState("");
@@ -137,10 +138,11 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
               {g.items.map((p, i) => {
                 const im = interetMeta(p.interet);
                 return (
-                  <Link
+                  <button
                     key={p.id}
-                    href={`/crm/prospect/${p.id}`}
-                    className={`flex items-center gap-4 px-4 py-3 transition-colors hover:bg-paper ${
+                    type="button"
+                    onClick={() => open(p.id)}
+                    className={`flex w-full items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-paper ${
                       i > 0 ? "border-t border-line" : ""
                     }`}
                   >
@@ -177,7 +179,7 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
                         à vérifier
                       </span>
                     )}
-                  </Link>
+                  </button>
                 );
               })}
             </div>
