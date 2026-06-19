@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Prospect } from "@/lib/crm";
-import { statutLabel, interetMeta, regionForDept, REGIONS, STATUTS, INTERETS } from "@/lib/crm";
+import { statutLabel, interetMeta, regionForDept, REGIONS, STATUTS, INTERETS, prospectScore, scoreTier } from "@/lib/crm";
 
 export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
   const [q, setQ] = useState("");
@@ -12,6 +12,7 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
   const [interet, setInteret] = useState("");
   const [statut, setStatut] = useState("");
   const [groupBy, setGroupBy] = useState<"" | "region" | "departement" | "ville">("region");
+  const [sortBy, setSortBy] = useState<"priorite" | "nom" | "recent">("priorite");
 
   const depts = useMemo(
     () =>
@@ -21,7 +22,7 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return prospects.filter((p) => {
+    const arr = prospects.filter((p) => {
       if (dept && p.departement !== dept) return false;
       if (region && regionForDept(p.departement) !== region) return false;
       if (interet && p.interet !== interet) return false;
@@ -32,7 +33,13 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
       }
       return true;
     });
-  }, [prospects, q, dept, region, interet, statut]);
+    arr.sort((a, b) => {
+      if (sortBy === "nom") return (a.nom ?? "").localeCompare(b.nom ?? "");
+      if (sortBy === "recent") return +new Date(b.created_at) - +new Date(a.created_at);
+      return prospectScore(b) - prospectScore(a);
+    });
+    return arr;
+  }, [prospects, q, dept, region, interet, statut, sortBy]);
 
   const groups = useMemo(() => {
     if (!groupBy) return [{ key: "", items: filtered }];
@@ -91,6 +98,15 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
           ))}
         </select>
         <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as "priorite" | "nom" | "recent")}
+          className={inputCls}
+        >
+          <option value="priorite">Tri : priorité</option>
+          <option value="nom">Tri : nom A→Z</option>
+          <option value="recent">Tri : récents</option>
+        </select>
+        <select
           value={groupBy}
           onChange={(e) => setGroupBy(e.target.value as "" | "region" | "departement" | "ville")}
           className={inputCls}
@@ -143,6 +159,19 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
                       <p className="text-[13px] font-medium text-ink">{p.telephone || "—"}</p>
                       <p className="text-[12px] text-mut">{statutLabel(p.statut)}</p>
                     </div>
+                    {(() => {
+                      const sc = prospectScore(p);
+                      const t = scoreTier(sc);
+                      return (
+                        <span
+                          className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold text-white"
+                          style={{ background: t.color }}
+                          title={t.label}
+                        >
+                          {sc}
+                        </span>
+                      );
+                    })()}
                     {p.verif === "doute" && (
                       <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
                         à vérifier

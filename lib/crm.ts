@@ -117,3 +117,33 @@ export function outcomeLabel(key: string | null) {
 export function interetMeta(key: string | null) {
   return INTERETS.find((s) => s.key === key);
 }
+
+// --- Lead scoring : priorité de rappel (0-100), heuristique sans IA externe ---
+// Combine intérêt, fiabilité de la fiche, statut pipeline, présence d'un numéro et contexte.
+export function prospectScore(p: Prospect): number {
+  let s = 0;
+  if (p.interet === "chaud") s += 40;
+  else if (p.interet === "tiede") s += 22;
+  else if (p.interet === "froid") s += 6;
+  if (p.verif === "ok") s += 12;
+  switch (p.statut) {
+    case "a_rappeler": s += 26; break;
+    case "proposition": s += 30; break;
+    case "r1_pose": s += 24; break;
+    case "rdv_honore": s += 18; break;
+    case "a_appeler": s += 10; break;
+    case "pas_interesse":
+    case "perdu":
+    case "signe": s -= 60; break;
+  }
+  if (p.telephone) s += 14;
+  if (p.notes) s += 4;
+  if (p.tags && p.tags.length) s += 4;
+  return Math.max(0, Math.min(100, s));
+}
+
+export function scoreTier(score: number): { key: "haute" | "moyenne" | "basse"; label: string; color: string } {
+  if (score >= 55) return { key: "haute", label: "Priorité haute", color: "#dc2626" };
+  if (score >= 30) return { key: "moyenne", label: "Priorité moyenne", color: "#d97706" };
+  return { key: "basse", label: "Priorité basse", color: "#64748b" };
+}
