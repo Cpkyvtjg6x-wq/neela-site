@@ -64,12 +64,16 @@ export async function getProspectDetail(id: string) {
   const { data: callsData } = await db
     .from("neela_calls").select("*").eq("prospect_id", id).order("created_at", { ascending: false });
   const calls = callsData ?? [];
+  // URLs audio signées en UNE seule requête groupée (au lieu d'une par appel = lent).
+  const recCalls = calls.filter((c) => c.recording_path);
   const audio: Record<string, string> = {};
-  for (const c of calls) {
-    if (c.recording_path) {
-      const { data } = await db.storage.from("neela-recordings").createSignedUrl(c.recording_path, 3600);
-      if (data?.signedUrl) audio[c.id] = data.signedUrl;
-    }
+  if (recCalls.length) {
+    const { data: signedList } = await db.storage
+      .from("neela-recordings")
+      .createSignedUrls(recCalls.map((c) => c.recording_path as string), 3600);
+    (signedList ?? []).forEach((s, i) => {
+      if (s.signedUrl) audio[recCalls[i].id] = s.signedUrl;
+    });
   }
   return { prospect, calls, audio };
 }

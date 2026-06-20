@@ -27,14 +27,17 @@ export default async function ProspectPage({ params }: { params: { id: string } 
     .from("neela_calls").select("*").eq("prospect_id", params.id).order("created_at", { ascending: false });
   const calls = (callsData ?? []) as Call[];
 
-  const withRec = calls.filter((c) => c.recording_path);
-  const signed = await Promise.all(
-    withRec.map(async (c) => {
-      const { data } = await db.storage.from("neela-recordings").createSignedUrl(c.recording_path!, 3600);
-      return [c.id, data?.signedUrl ?? null] as const;
-    })
-  );
-  const urlMap = new Map(signed);
+  // URLs audio signées en UNE seule requête groupée (au lieu d'une par appel = lent).
+  const recCalls = calls.filter((c) => c.recording_path);
+  const urlMap = new Map<string, string | null>();
+  if (recCalls.length) {
+    const { data: signedList } = await db.storage
+      .from("neela-recordings")
+      .createSignedUrls(recCalls.map((c) => c.recording_path as string), 3600);
+    (signedList ?? []).forEach((s, i) => {
+      urlMap.set(recCalls[i].id, s.signedUrl ?? null);
+    });
+  }
 
   const im = interetMeta(p.interet);
 
