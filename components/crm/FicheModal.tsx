@@ -105,12 +105,7 @@ function FicheModal({ id, onClose }: { id: string; onClose: () => void }) {
             </div>
 
             {/* Bloc unique : enregistrer l'appel + rappel */}
-            <InteractionForm
-              prospectId={p.id}
-              defaultStatut={p.statut ?? ""}
-              defaultInteret={p.interet ?? ""}
-              onSaved={onClose}
-            />
+            <InteractionForm prospectId={p.id} onSaved={onClose} />
 
             {/* Historique compact */}
             {data!.calls.length > 0 && (

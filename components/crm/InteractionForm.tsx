@@ -3,19 +3,15 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Mic, Square, Trash2 } from "lucide-react";
-import { OUTCOMES, STATUTS, INTERETS } from "@/lib/crm";
+import { OUTCOMES } from "@/lib/crm";
 import { addCall } from "@/app/crm/actions";
 import TagInput from "./TagInput";
 
 export default function InteractionForm({
   prospectId,
-  defaultStatut,
-  defaultInteret,
   onSaved,
 }: {
   prospectId: string;
-  defaultStatut?: string;
-  defaultInteret?: string;
   onSaved?: () => void;
 }) {
   const router = useRouter();
@@ -152,32 +148,7 @@ export default function InteractionForm({
         })}
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div>
-          <p className={label}>Statut</p>
-          <select name="statut" defaultValue={defaultStatut || ""} className={field}>
-            <option value="">(inchangé)</option>
-            {STATUTS.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <p className={label}>Intérêt</p>
-          <select name="interet" defaultValue={defaultInteret || ""} className={field}>
-            <option value="">(inchangé)</option>
-            {INTERETS.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="mt-3">
+      <div className="mt-4">
         <p className={label}>Tags</p>
         <TagInput key={tagKey} name="tags" placeholder="ex : décideur absent…" />
       </div>

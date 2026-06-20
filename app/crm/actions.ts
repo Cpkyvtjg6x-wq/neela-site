@@ -107,6 +107,13 @@ export async function addCall(formData: FormData) {
   const rappel_at = localParisToISO(rappelRaw);
   const tags = parseTags(formData.get("tags"));
 
+  // Le statut se déduit automatiquement du résultat de l'appel (plus de case à remplir).
+  const STATUT_FROM_OUTCOME: Record<string, string> = {
+    a_rappeler: "a_rappeler", r1_pose: "r1_pose", proposition: "proposition",
+    signe: "signe", pas_interesse: "pas_interesse",
+  };
+  const effectiveStatut = statut || STATUT_FROM_OUTCOME[outcome] || (rappel_at ? "a_rappeler" : "");
+
   const db = getDb();
 
   let recording_path: string | null = null;
@@ -126,7 +133,7 @@ export async function addCall(formData: FormData) {
     prospect_id: prospectId,
     outcome: outcome || null,
     notes: notes || null,
-    statut: statut || null,
+    statut: effectiveStatut || null,
     interet: interet || null,
     rappel_at,
     tags,
@@ -135,7 +142,7 @@ export async function addCall(formData: FormData) {
   if (callErr) throw new Error(callErr.message);
 
   const patch: Record<string, unknown> = {};
-  if (statut) patch.statut = statut;
+  if (effectiveStatut) patch.statut = effectiveStatut;
   if (interet) patch.interet = interet;
   if (tags.length) patch.tags = tags;
   if (Object.keys(patch).length) {

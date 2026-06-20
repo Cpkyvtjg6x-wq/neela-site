@@ -76,7 +76,7 @@ export default async function ProspectPage({ params }: { params: { id: string } 
       <div className="mt-7 grid gap-6 lg:grid-cols-[1.05fr_1fr]">
         {/* Colonne gauche : le bloc unique d'interaction + coordonnées */}
         <div className="space-y-6">
-          <InteractionForm prospectId={p.id} defaultStatut={p.statut ?? ""} defaultInteret={p.interet ?? ""} />
+          <InteractionForm prospectId={p.id} />
 
           {/* Fiche & coordonnées — tout est corrigeable ici */}
           <ProspectInfoForm p={p} />
