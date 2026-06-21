@@ -10,8 +10,8 @@ export default function AgendaTabs({ items, nowISO }: { items: AgendaItem[]; now
   const tab = (v: typeof view, label: string) => (
     <button
       onClick={() => setView(v)}
-      className={`rounded-lg px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
-        view === v ? "bg-ink text-paper" : "text-mut hover:text-ink"
+      className={`rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+        view === v ? "bg-white text-ink shadow-sm" : "text-mut hover:text-ink"
       }`}
     >
       {label}
@@ -20,7 +20,7 @@ export default function AgendaTabs({ items, nowISO }: { items: AgendaItem[]; now
 
   return (
     <div>
-      <div className="mb-4 inline-flex rounded-xl border border-line bg-white p-1">
+      <div className="mb-4 inline-flex gap-0.5 rounded-xl border border-line bg-paper p-1">
         {tab("week", "Semaine")}
         {tab("day", "Jour")}
         {tab("list", "Liste")}
