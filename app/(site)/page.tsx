@@ -9,6 +9,10 @@ import Dashboard from "@/components/Dashboard";
 import Parallax from "@/components/Parallax";
 import Steps from "@/components/Steps";
 import GuaranteeBand from "@/components/GuaranteeBand";
+import ForWho from "@/components/ForWho";
+import Testimonials from "@/components/Testimonials";
+import Founder from "@/components/Founder";
+import Faq from "@/components/Faq";
 
 const STATS = [
   { to: 4, suffix: "", label: "1 Français sur 4 entend mal" },
@@ -90,6 +94,9 @@ export default function HomePage() {
       {/* Showcase pubs — défilé horizontal cinématique */}
       <HorizontalAds />
 
+      {/* Pour qui + offre incluse */}
+      <ForWho />
+
       {/* Aperçu services */}
       <section className="container-wide py-28 md:py-40">
         <Reveal>
@@ -142,8 +149,14 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Preuve sociale — témoignages & résultats */}
+      <Testimonials />
+
       {/* Méthode */}
       <Steps />
+
+      {/* Le fondateur */}
+      <Founder />
 
       <Marquee
         items={[
@@ -158,6 +171,9 @@ export default function HomePage() {
 
       {/* Garantie — bande sombre cinématique */}
       <GuaranteeBand />
+
+      {/* FAQ — lever les dernières objections */}
+      <Faq />
 
       {/* CTA final */}
       <section className="container-wide py-32 text-center md:py-44">
@@ -178,6 +194,13 @@ export default function HomePage() {
               Réserver mon appel →
             </MagneticButton>
           </div>
+          <p className="mt-6 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-mut">
+            <span>Sans engagement</span>
+            <span className="text-accent">·</span>
+            <span>Réponse sous 24&nbsp;h</span>
+            <span className="text-accent">·</span>
+            <span>Garantie 15&nbsp;RDV le 1<sup>er</sup> mois</span>
+          </p>
         </Reveal>
       </section>
     </>

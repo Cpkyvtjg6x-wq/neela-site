@@ -110,6 +110,20 @@ export default function Hero() {
             Voir nos réalisations
           </MagneticButton>
         </motion.div>
+
+        <motion.p
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: EASE, delay: 1.15 }}
+          className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-mut"
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <span>Sans engagement</span>
+          <span className="text-accent">·</span>
+          <span>Réponse sous 24&nbsp;h</span>
+          <span className="text-accent">·</span>
+          <span>Garantie 15&nbsp;RDV le 1<sup>er</sup> mois</span>
+        </motion.p>
       </motion.div>
 
       {/* Indicateur de scroll */}
