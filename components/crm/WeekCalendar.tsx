@@ -209,14 +209,16 @@ export default function WeekCalendar({
             const showNow = isToday && nowParts.min >= hourStart * 60 && nowParts.min <= hourEnd * 60;
             return (
               <div key={key} className={`relative border-l border-line ${weekend ? "bg-paper/40" : ""} ${isToday ? "bg-accent/[0.03]" : ""}`}>
-                {/* lignes d'heures */}
-                {hours.map((h, i) => (
-                  <div
-                    key={h}
-                    className={`absolute inset-x-0 ${i === 0 ? "" : "border-t"} border-line/70`}
-                    style={{ top: (h - hourStart) * PX, height: PX }}
-                  />
-                ))}
+                {/* lignes d'heures (fines et claires) */}
+                {hours.map((h, i) =>
+                  i === 0 ? null : (
+                    <div
+                      key={h}
+                      className="absolute inset-x-0"
+                      style={{ top: (h - hourStart) * PX, borderTop: "1px solid rgba(10,10,10,0.06)" }}
+                    />
+                  )
+                )}
 
                 {placed.map((pl) => (
                   <EventBlock
@@ -291,8 +293,7 @@ function EventBlock({
         left,
         width,
         background: s.bg,
-        borderLeft: `3px solid ${s.bar}`,
-        boxShadow: overdue ? "0 0 0 1.5px #ef4444" : undefined,
+        borderLeft: `3px solid ${overdue ? "#EF4444" : s.bar}`,
       }}
     >
       <span
