@@ -677,11 +677,11 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
               {paybackIdx >= 0 ? <>, investissement récupéré au <b>mois {paybackIdx + 1}</b>.</> : "."}
             </p>
 
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
               <select
                 value=""
                 onChange={(e) => e.target.value && setCentreName(e.target.value)}
-                className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none [color-scheme:dark]"
+                className="min-w-0 truncate rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none [color-scheme:dark]"
               >
                 <option value="">Choisir un centre du CRM…</option>
                 {centres.map((c) => (
@@ -692,13 +692,13 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
                 value={centreName}
                 onChange={(e) => setCentreName(e.target.value)}
                 placeholder="ou nom du centre…"
-                className="flex-1 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/50 outline-none"
+                className="min-w-0 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/50 outline-none"
               />
               <button
                 onClick={exportProposal}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
               >
-                <FileDown size={16} /> Exporter la proposition
+                <FileDown size={16} /> Exporter
               </button>
             </div>
           </div>
