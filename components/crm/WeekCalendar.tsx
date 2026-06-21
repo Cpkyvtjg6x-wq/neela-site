@@ -8,7 +8,7 @@ import { useFiche } from "./FicheModal";
 import type { AgendaItem } from "./AgendaView";
 
 const PARIS = "Europe/Paris";
-const PX = 52; // hauteur d'une heure (px)
+const PX = 58; // hauteur d'une heure (px)
 const DEFAULT_DUR = 30; // durée par défaut (min)
 
 function parisParts(d: Date): { key: string; min: number } {
@@ -122,6 +122,10 @@ export default function WeekCalendar({
   const hours = Array.from({ length: hourEnd - hourStart }, (_, i) => hourStart + i);
   const totalH = (hourEnd - hourStart) * PX;
 
+  const nowTop = ((nowParts.min - hourStart * 60) / 60) * PX;
+  const nowVisible = nowParts.min >= hourStart * 60 && nowParts.min <= hourEnd * 60;
+  const todayInView = cols.includes(todayKey);
+
   const byDay = useMemo(() => {
     const m = new Map<string, AgendaItem[]>();
     for (const it of items) {
@@ -197,6 +201,14 @@ export default function WeekCalendar({
                 </span>
               )
             )}
+            {nowVisible && todayInView && (
+              <span
+                className="absolute right-1.5 -translate-y-1/2 rounded bg-red-500 px-1 py-px text-[10px] font-bold tabular-nums text-white"
+                style={{ top: nowTop }}
+              >
+                {hhmm(nowParts.min)}
+              </span>
+            )}
           </div>
 
           {/* Colonnes des jours */}
@@ -205,20 +217,18 @@ export default function WeekCalendar({
             const isToday = key === todayKey;
             const wd = weekday(key);
             const weekend = wd === 0 || wd === 6;
-            const nowTop = ((nowParts.min - hourStart * 60) / 60) * PX;
-            const showNow = isToday && nowParts.min >= hourStart * 60 && nowParts.min <= hourEnd * 60;
+            const showNow = isToday && nowVisible;
             return (
-              <div key={key} className={`relative border-l border-line ${weekend ? "bg-paper/40" : ""} ${isToday ? "bg-accent/[0.03]" : ""}`}>
-                {/* lignes d'heures (fines et claires) */}
-                {hours.map((h, i) =>
-                  i === 0 ? null : (
-                    <div
-                      key={h}
-                      className="absolute inset-x-0"
-                      style={{ top: (h - hourStart) * PX, borderTop: "1px solid rgba(10,10,10,0.06)" }}
-                    />
-                  )
-                )}
+              <div key={key} className={`relative border-l border-line ${weekend ? "bg-paper/40" : ""} ${isToday ? "bg-accent/[0.04]" : ""}`}>
+                {/* lignes d'heures + demi-heures */}
+                {hours.map((h, i) => (
+                  <div key={h}>
+                    {i !== 0 && (
+                      <div className="absolute inset-x-0" style={{ top: (h - hourStart) * PX, borderTop: "1px solid rgba(10,10,10,0.06)" }} />
+                    )}
+                    <div className="absolute inset-x-0" style={{ top: (h - hourStart) * PX + PX / 2, borderTop: "1px solid rgba(10,10,10,0.03)" }} />
+                  </div>
+                ))}
 
                 {placed.map((pl) => (
                   <EventBlock
@@ -233,7 +243,7 @@ export default function WeekCalendar({
                 {showNow && (
                   <div className="pointer-events-none absolute inset-x-0 z-20" style={{ top: nowTop }}>
                     <div className="relative border-t-2 border-red-500">
-                      <span className="absolute -left-[3px] -top-[5px] h-2 w-2 rounded-full bg-red-500" />
+                      <span className="absolute -left-[4px] -top-[5px] h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
                     </div>
                   </div>
                 )}
@@ -293,6 +303,7 @@ function EventBlock({
         left,
         width,
         background: s.bg,
+        border: "0.5px solid rgba(10,10,10,0.07)",
         borderLeft: `3px solid ${overdue ? "#EF4444" : s.bar}`,
       }}
     >
@@ -300,11 +311,11 @@ function EventBlock({
         className="truncate text-[11.5px] font-bold leading-tight"
         style={{ color: s.tx, textDecoration: done ? "line-through" : undefined }}
       >
-        {pl.item.type === "rappel" ? "Rappel — " : ""}{pl.item.title}
+        {pl.item.title}
       </span>
       {tall && (
-        <span className="truncate text-[10.5px] font-medium leading-tight" style={{ color: s.tx, opacity: 0.75 }}>
-          {hhmm(pl.startMin)}
+        <span className="truncate text-[10.5px] font-medium leading-tight" style={{ color: s.tx, opacity: 0.7 }}>
+          {hhmm(pl.startMin)}{pl.item.type === "rappel" ? " · rappel" : ""}
         </span>
       )}
     </button>
