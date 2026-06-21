@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 import type { Prospect, Call } from "@/lib/crm";
@@ -38,6 +38,7 @@ function fmt(d: string | null) {
 function FicheModal({ id, onClose }: { id: string; onClose: () => void }) {
   const [data, setData] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
+  const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -53,13 +54,36 @@ function FicheModal({ id, onClose }: { id: string; onClose: () => void }) {
     };
   }, [id]);
 
+  // Échap ferme la modale ; on bloque le scroll de l'arrière-plan ; focus initial sur « Fermer ».
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
   const p = data?.prospect;
   const im = p ? interetMeta(p.interet) : undefined;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-3 sm:p-6">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-3 sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className="relative my-4 w-full max-w-3xl rounded-2xl bg-paper shadow-2xl">
         <button
+          ref={closeRef}
           onClick={onClose}
           aria-label="Fermer"
           className="absolute right-3 top-3 z-10 rounded-full bg-white p-1.5 text-mut shadow hover:text-ink"

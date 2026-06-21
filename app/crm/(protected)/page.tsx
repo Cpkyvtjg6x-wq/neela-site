@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Flame, PhoneOutgoing, CalendarClock, Users, Plus, Check } from "lucide-react";
+import { Flame, PhoneOutgoing, CalendarClock, Users, Plus, Check, PhoneCall, AlertTriangle } from "lucide-react";
 import { getAllProspects, getAllCalls, getAppointments, indexProspects } from "@/lib/crmData";
 import { STATUTS, statutLabel, regionForDept } from "@/lib/crm";
 import { clearRappel } from "@/app/crm/actions";
@@ -35,10 +35,20 @@ export default async function Dashboard() {
   const contactedSet = new Set(calls.map((c) => c.prospect_id));
   const aAppeler = prospects.filter((p) => !contactedSet.has(p.id)).length;
 
-  const rappels = calls
+  const rappelsAll = calls
     .filter((c) => c.rappel_at && new Date(c.rappel_at) <= endToday)
-    .sort((a, b) => +new Date(a.rappel_at!) - +new Date(b.rappel_at!))
-    .slice(0, 8);
+    .sort((a, b) => +new Date(a.rappel_at!) - +new Date(b.rappel_at!));
+  const rappels = rappelsAll.slice(0, 8);
+  // Relances en retard : prospects distincts dont la date de rappel est déjà passée.
+  const overdueProspects = new Set(
+    calls.filter((c) => c.rappel_at && new Date(c.rappel_at) < now).map((c) => c.prospect_id)
+  );
+  const overdueCount = overdueProspects.size;
+
+  // Appels passés aujourd'hui (jour calendaire Europe/Paris).
+  const parisDay = (d: Date) => d.toLocaleDateString("fr-CA", { timeZone: "Europe/Paris" });
+  const todayKey = parisDay(now);
+  const callsToday = calls.filter((c) => parisDay(new Date(c.created_at)) === todayKey).length;
 
   const prochainsRdv = appts
     .filter((a) => a.status === "reserve" && a.source !== "rappel" && new Date(a.start_at) >= new Date(now.toDateString()))
@@ -64,6 +74,7 @@ export default async function Dashboard() {
     { label: "Prospects", value: total, icon: Users, color: "#2563eb" },
     { label: "Chauds", value: chauds, icon: Flame, color: "#dc2626" },
     { label: "À appeler", value: aAppeler, icon: PhoneOutgoing, color: "#0a0a0a" },
+    { label: "Appels aujourd'hui", value: callsToday, icon: PhoneCall, color: "#7c3aed" },
     { label: "RDV à venir", value: rdvAvenir, icon: CalendarClock, color: "#059669" },
   ];
 
@@ -81,8 +92,24 @@ export default async function Dashboard() {
         </Link>
       </div>
 
+      {/* Bandeau relances en retard */}
+      {overdueCount > 0 && (
+        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+          <AlertTriangle size={20} className="shrink-0 text-red-600" />
+          <p className="flex-1 text-sm font-medium text-red-800">
+            <strong>{overdueCount}</strong> relance{overdueCount > 1 ? "s" : ""} en retard à traiter en priorité.
+          </p>
+          <Link
+            href="/crm/journal"
+            className="shrink-0 rounded-full bg-red-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+          >
+            Voir
+          </Link>
+        </div>
+      )}
+
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         {kpis.map((k) => {
           const Icon = k.icon;
           return (
@@ -98,7 +125,14 @@ export default async function Dashboard() {
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         {/* Rappels à traiter */}
         <div className="rounded-2xl border border-line bg-white p-5">
-          <h2 className="mb-4 font-display text-lg font-bold">Rappels à traiter</h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-display text-lg font-bold">Rappels à traiter</h2>
+            {overdueCount > 0 && (
+              <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-600">
+                {overdueCount} en retard
+              </span>
+            )}
+          </div>
           {rappels.length === 0 ? (
             <p className="text-sm text-mut">Aucun rappel en attente.</p>
           ) : (

@@ -27,6 +27,18 @@ function validDept(v: string): boolean {
   return /^\d{2,3}$/.test(v);
 }
 
+// Email : validation souple (présence d'un @ et d'un domaine plausible).
+function validEmail(v: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
+// Téléphone : on accepte espaces, points, tirets, parenthèses et +.
+// On exige seulement un nombre de chiffres plausible (10 en France, jusqu'à 15 à l'international).
+function validPhone(v: string): boolean {
+  const digits = v.replace(/[^\d]/g, "");
+  return digits.length >= 10 && digits.length <= 15;
+}
+
 // Une saisie <input type="datetime-local"> est une heure « murale » sans fuseau.
 // Le serveur (Vercel) tourne en UTC : sans conversion, « 14h30 » serait pris pour 14h30 UTC
 // puis réaffiché en heure de Paris (+2h l'été). On interprète donc la saisie comme Europe/Paris.
@@ -100,6 +112,10 @@ export async function updateProspect(formData: FormData) {
   if (typeof patch.statut === "string" && !STATUT_KEYS.has(patch.statut)) throw new Error("Statut invalide.");
   if (typeof patch.interet === "string" && !INTERET_KEYS.has(patch.interet)) throw new Error("Intérêt invalide.");
   if (typeof patch.verif === "string" && !VERIF_KEYS.has(patch.verif)) throw new Error("Valeur de vérification invalide.");
+  if (typeof patch.email === "string" && !validEmail(patch.email)) throw new Error("Email invalide.");
+  if (typeof patch.telephone === "string" && !validPhone(patch.telephone)) {
+    throw new Error("Téléphone invalide : indique un numéro à 10 chiffres (ex. 06 12 34 56 78).");
+  }
   const db = getDb();
   const { error } = await db.from("neela_prospects").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
@@ -193,6 +209,14 @@ export async function addProspect(
   if (departement && !validDept(departement)) {
     return { ok: false, error: "Département invalide : indique 2 ou 3 chiffres (ex. 34, 971)." };
   }
+  const emailRaw = String(formData.get("email") || "").trim();
+  if (emailRaw && !validEmail(emailRaw)) {
+    return { ok: false, error: "Email invalide." };
+  }
+  const telRaw = String(formData.get("telephone") || "").trim();
+  if (telRaw && !validPhone(telRaw)) {
+    return { ok: false, error: "Téléphone invalide : indique un numéro à 10 chiffres (ex. 06 12 34 56 78)." };
+  }
   const db = getDb();
   // Anti-doublon : un prospect du même nom existe-t-il déjà ?
   const { data: existing } = await db.from("neela_prospects").select("id").ilike("nom", nom).limit(1);
@@ -227,6 +251,12 @@ export async function addAppointment(formData: FormData) {
   const db = getDb();
   const start_at = localParisToISO(startRaw);
   if (!start_at) throw new Error("Date/heure du rendez-vous invalide.");
+  const apptEmail = String(formData.get("email") || "").trim();
+  if (apptEmail && !validEmail(apptEmail)) throw new Error("Email invalide.");
+  const apptPhone = String(formData.get("phone") || "").trim();
+  if (apptPhone && !validPhone(apptPhone)) {
+    throw new Error("Téléphone invalide : indique un numéro à 10 chiffres (ex. 06 12 34 56 78).");
+  }
   const { error } = await db.from("neela_appointments").insert({
     start_at,
     name: String(formData.get("name") || "") || null,
