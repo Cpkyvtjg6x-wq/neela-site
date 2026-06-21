@@ -5,6 +5,11 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { AUTH_COOKIE, isAuthed } from "@/lib/auth";
 import { getDb } from "@/lib/supabaseAdmin";
+import { STATUTS, INTERETS } from "@/lib/crm";
+
+const STATUT_KEYS = new Set(STATUTS.map((s) => s.key));
+const INTERET_KEYS = new Set(INTERETS.map((s) => s.key));
+const VERIF_KEYS = new Set(["ok", "doute"]);
 
 function assertAuth() {
   if (!isAuthed()) throw new Error("Non autorisé");
@@ -83,7 +88,7 @@ export async function updateProspect(formData: FormData) {
   assertAuth();
   const id = String(formData.get("id"));
   const patch: Record<string, unknown> = {};
-  for (const f of ["nom", "centre", "ville", "departement", "telephone", "email", "statut", "interet", "notes"]) {
+  for (const f of ["nom", "centre", "ville", "departement", "telephone", "email", "statut", "interet", "verif", "notes"]) {
     const v = formData.get(f);
     if (v !== null) patch[f] = String(v) === "" ? null : String(v);
   }
@@ -92,6 +97,9 @@ export async function updateProspect(formData: FormData) {
   if (typeof patch.departement === "string" && !validDept(patch.departement)) {
     throw new Error("Département invalide : indique 2 ou 3 chiffres (ex. 34, 971).");
   }
+  if (typeof patch.statut === "string" && !STATUT_KEYS.has(patch.statut)) throw new Error("Statut invalide.");
+  if (typeof patch.interet === "string" && !INTERET_KEYS.has(patch.interet)) throw new Error("Intérêt invalide.");
+  if (typeof patch.verif === "string" && !VERIF_KEYS.has(patch.verif)) throw new Error("Valeur de vérification invalide.");
   const db = getDb();
   const { error } = await db.from("neela_prospects").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
@@ -255,7 +263,7 @@ export async function clearRappel(formData: FormData) {
   const { error } = await db.from("neela_calls").update({ rappel_at: null }).eq("id", callId);
   if (error) throw new Error(error.message);
   if (prospectId) {
-    await db.from("neela_appointments").delete().eq("prospect_id", prospectId).eq("source", "rappel");
+    await db.from("neela_appointments").delete().eq("prospect_id", prospectId).in("source", ["rappel", "r1"]);
   }
   revalidateCrm(prospectId || undefined);
   revalidatePath("/crm/agenda");

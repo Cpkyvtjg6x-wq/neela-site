@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Mic, Square, Trash2 } from "lucide-react";
-import { OUTCOMES } from "@/lib/crm";
+import { OUTCOMES, INTERETS } from "@/lib/crm";
 import { addCall } from "@/app/crm/actions";
 import TagInput from "./TagInput";
 
@@ -18,6 +18,7 @@ export default function InteractionForm({
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, startTransition] = useTransition();
   const [outcome, setOutcome] = useState("");
+  const [interet, setInteret] = useState("");
   const [rappelType, setRappelType] = useState<"rappel" | "r1">("rappel");
   const [tagKey, setTagKey] = useState(0);
   const [err, setErr] = useState<string | null>(null);
@@ -97,6 +98,7 @@ export default function InteractionForm({
     const fd = new FormData(e.currentTarget);
     fd.set("prospect_id", prospectId);
     fd.set("outcome", outcome);
+    fd.set("interet", interet);
     fd.set("rappel_type", rappelType);
     if (blob) {
       const ext = blob.type.includes("mp4") || blob.type.includes("m4a") ? "m4a" : "webm";
@@ -107,6 +109,7 @@ export default function InteractionForm({
         await addCall(fd);
         formRef.current?.reset();
         setOutcome("");
+        setInteret("");
         setRappelType("rappel");
         setTagKey((k) => k + 1);
         clearRec();
@@ -143,6 +146,29 @@ export default function InteractionForm({
               }`}
             >
               {o.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Intérêt en pastilles */}
+      <p className={`${label} mt-4`}>Intérêt</p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {INTERETS.map((it) => {
+          const on = interet === it.key;
+          return (
+            <button
+              type="button"
+              key={it.key}
+              onClick={() => setInteret(on ? "" : it.key)}
+              className="rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors"
+              style={
+                on
+                  ? { background: it.color, color: "#fff" }
+                  : { border: `1px solid ${it.color}`, color: it.color }
+              }
+            >
+              {it.label}
             </button>
           );
         })}

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Prospect } from "@/lib/crm";
+import { STATUTS, INTERETS } from "@/lib/crm";
 import { updateProspect } from "@/app/crm/actions";
 
 export default function ProspectInfoForm({ p }: { p: Prospect }) {
@@ -57,6 +58,31 @@ export default function ProspectInfoForm({ p }: { p: Prospect }) {
         <div>
           <p className={label}>Département</p>
           <input name="departement" defaultValue={p.departement ?? ""} maxLength={3} className={field} />
+        </div>
+        <div>
+          <p className={label}>Statut</p>
+          <select name="statut" defaultValue={p.statut ?? ""} className={field}>
+            {STATUTS.map((s) => (
+              <option key={s.key} value={s.key}>{s.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <p className={label}>Intérêt</p>
+          <select name="interet" defaultValue={p.interet ?? ""} className={field}>
+            <option value="">— Non défini</option>
+            {INTERETS.map((s) => (
+              <option key={s.key} value={s.key}>{s.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="sm:col-span-2">
+          <p className={label}>Fiche vérifiée ?</p>
+          <select name="verif" defaultValue={p.verif ?? ""} className={field}>
+            <option value="">— Non renseigné</option>
+            <option value="ok">Vérifiée (coordonnées fiables)</option>
+            <option value="doute">À vérifier (doute)</option>
+          </select>
         </div>
       </div>
       <div className="mt-3">
