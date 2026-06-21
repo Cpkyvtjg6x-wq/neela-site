@@ -106,7 +106,7 @@ function FicheModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.18 }}
+      transition={{ duration: 0.22, ease: EASE }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -116,7 +116,7 @@ function FicheModal({
         initial={{ opacity: 0, y: 16, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 12, scale: 0.98 }}
-        transition={{ duration: 0.24, ease: EASE }}
+        transition={{ duration: 0.22, ease: EASE }}
       >
         <button
           ref={closeRef}
