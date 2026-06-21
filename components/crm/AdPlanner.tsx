@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Target, Wallet, ShieldCheck, Gauge, Rocket, AlertTriangle, CheckCircle2, MapPin, FileDown, TrendingUp, Sliders, Layers } from "lucide-react";
+import { Target, Wallet, ShieldCheck, Gauge, Rocket, AlertTriangle, CheckCircle2, MapPin, FileDown, TrendingUp, Sliders, Layers, Search } from "lucide-react";
+import { FR_DEPTS } from "@/lib/frDepartements";
 
 const eur = (n: number) => Math.round(n).toLocaleString("fr-FR") + " €";
 const num = (n: number) => Math.round(n).toLocaleString("fr-FR");
@@ -22,6 +23,7 @@ type Vocab = {
   premiumLabel: string; margePremiumLabel: string; margeBaseLabel: string;
   margeUnit: string; audienceLabel: string;
   partPremium: number; margePremium: number; margeBase: number;
+  share: number; density: number; adKeyword: string;
 };
 const METIERS: Record<Metier, Vocab> = {
   audio: {
@@ -31,6 +33,7 @@ const METIERS: Record<Metier, Vocab> = {
     margeBaseLabel: "Marge moyenne Classe 1 (100% Santé)", margeUnit: "/ appareillage",
     audienceLabel: "Population 55 ans et + ciblable",
     partPremium: 50, margePremium: 1500, margeBase: 300,
+    share: 0.31, density: 16000, adKeyword: "audioprothésiste",
   },
   optique: {
     label: "Opticien", objectif: "RDV / visites visés / mois",
@@ -39,6 +42,7 @@ const METIERS: Record<Metier, Vocab> = {
     margeBaseLabel: "Marge moyenne entrée de gamme", margeUnit: "/ équipement",
     audienceLabel: "Population ciblable (zone)",
     partPremium: 40, margePremium: 280, margeBase: 90,
+    share: 0.55, density: 6000, adKeyword: "opticien",
   },
   dentaire: {
     label: "Cabinet dentaire", objectif: "Nouveaux patients visés / mois",
@@ -47,6 +51,7 @@ const METIERS: Record<Metier, Vocab> = {
     margeBaseLabel: "Marge moyenne soins courants", margeUnit: "/ patient",
     audienceLabel: "Population ciblable (zone)",
     partPremium: 30, margePremium: 1200, margeBase: 150,
+    share: 0.50, density: 1700, adKeyword: "dentiste",
   },
 };
 
@@ -56,12 +61,13 @@ type Ctx = {
   targetRdv: number; budget: number;
   marge: number; fee: number;
   ceiling: number; period: "apprentissage" | "regime";
+  compMult: number;
 };
 
 const satMult = (u: number) => (u <= 1 ? 1 : 1 + (u - 1) * 0.6);
 
 function compute(a: Assum, c: Ctx) {
-  const cplMult = c.period === "apprentissage" ? 1.35 : 1;
+  const cplMult = (c.period === "apprentissage" ? 1.35 : 1) * c.compMult;
   const convMult = c.period === "apprentissage" ? 0.8 : 1;
   const l2r = (a.leadToRdv / 100) * convMult;
   const pres = a.presence / 100, cl = a.closing / 100;
@@ -132,6 +138,11 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
 
   const [centreName, setCentreName] = useState("");
 
+  const [dept, setDept] = useState("");
+  const [scope, setScope] = useState<"commune" | "agglo" | "departement">("agglo");
+  const [ville, setVille] = useState("");
+  const [compLevel, setCompLevel] = useState<"faible" | "moyenne" | "forte">("moyenne");
+
   const V = METIERS[metier];
 
   const applyMetier = (m: Metier) => {
@@ -149,7 +160,22 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   const blendedMarge = (partC2 / 100) * margeC2 + (1 - partC2 / 100) * margeC1;
   const ceiling = pop55 * 0.005;
 
-  const ctx: Ctx = { mode, targetRdv, budget, marge: blendedMarge, fee, ceiling, period };
+  // Zone géographique
+  const dep = FR_DEPTS.find((d) => d.code === dept);
+  const scopeFrac = scope === "commune" ? 0.08 : scope === "agglo" ? 0.3 : 1;
+  const scopedPop = dep ? Math.round(dep.pop * scopeFrac) : 0;
+  const estPop = Math.round(scopedPop * V.share);
+  const estCompetitors = dep ? Math.max(1, Math.round(scopedPop / V.density)) : 0;
+  const applyZone = () => { if (estPop) setPop55(Math.min(200000, Math.max(1500, Math.round(estPop / 1000) * 1000))); };
+
+  // Concurrence → multiplicateur de CPL
+  const compMult = compLevel === "faible" ? 0.9 : compLevel === "forte" ? 1.25 : 1;
+
+  // Lien vers la bibliothèque publicitaire Meta (pré-remplie)
+  const adKw = `${V.adKeyword} ${ville.trim() || dep?.nom || ""}`.trim();
+  const adLibUrl = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=FR&media_type=all&q=${encodeURIComponent(adKw)}&search_type=keyword_unordered`;
+
+  const ctx: Ctx = { mode, targetRdv, budget, marge: blendedMarge, fee, ceiling, period, compMult };
   const cur: Assum = { cpl, leadToRdv, presence, closing };
 
   const r = compute(cur, ctx);
@@ -395,9 +421,56 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
           </div>
 
           <div className={card}>
-            <h2 className="mb-1 flex items-center gap-2 font-display text-base font-bold"><MapPin size={16} className="text-accent" /> Zone du centre</h2>
-            <p className="mb-4 text-xs text-mut">Plafond estimé : ~<b className="text-ink">{num(ceiling)}</b> leads/mois absorbables avant saturation</p>
-            <Slider label={V.audienceLabel} value={pop55} set={setPop55} min={1500} max={80000} step={500} />
+            <h2 className="mb-3 flex items-center gap-2 font-display text-base font-bold"><MapPin size={16} className="text-accent" /> Zone &amp; concurrence</h2>
+
+            <div className="grid grid-cols-2 gap-2">
+              <select value={dept} onChange={(e) => setDept(e.target.value)}
+                className="rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent">
+                <option value="">Département…</option>
+                {FR_DEPTS.map((d) => <option key={d.code} value={d.code}>{d.code} · {d.nom}</option>)}
+              </select>
+              <select value={scope} onChange={(e) => setScope(e.target.value as "commune" | "agglo" | "departement")}
+                className="rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent">
+                <option value="commune">Commune</option>
+                <option value="agglo">Agglomération</option>
+                <option value="departement">Département</option>
+              </select>
+            </div>
+
+            {dep && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-paper p-3 text-xs text-mut">
+                <span>Zone ≈ <b className="text-ink">{num(scopedPop)}</b> hab. · cible <b className="text-ink">{num(estPop)}</b> · ~<b className="text-ink">{estCompetitors}</b> concurrents estimés</span>
+                <button onClick={applyZone} className="ml-auto rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-white hover:opacity-90">Appliquer</button>
+              </div>
+            )}
+
+            <div className="mt-4">
+              <Slider label={V.audienceLabel} value={pop55} set={setPop55} min={1500} max={200000} step={1000} />
+              <p className="mt-2 text-xs text-mut">Plafond estimé : ~<b className="text-ink">{num(ceiling)}</b> leads/mois avant saturation</p>
+            </div>
+
+            <div className="mt-4">
+              <p className="text-sm font-medium text-ink">Intensité concurrentielle</p>
+              <div className="mt-2 flex gap-2">
+                {(["faible", "moyenne", "forte"] as const).map((l) => (
+                  <button key={l} onClick={() => setCompLevel(l)}
+                    className={`flex-1 rounded-full border px-2 py-1.5 text-xs font-semibold capitalize ${compLevel === l ? "border-accent bg-accent text-white" : "border-line text-mut hover:border-accent"}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-mut">Impact sur le CPL : <b className="text-ink">×{num1(compMult)}</b>{estCompetitors > 0 && <> · ~{estCompetitors} concurrents dans la zone</>}</p>
+            </div>
+
+            <div className="mt-4">
+              <input value={ville} onChange={(e) => setVille(e.target.value)} placeholder="Ville (pour la recherche Meta)"
+                className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent" />
+              <a href={adLibUrl} target="_blank" rel="noopener noreferrer"
+                className="mt-2 inline-flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-sm font-semibold text-ink hover:border-accent hover:text-accent">
+                <Search size={15} /> Voir les pubs Meta de la zone
+              </a>
+              <p className="mt-1.5 text-[11px] text-mut">Ouvre la bibliothèque publicitaire officielle Meta, pré-remplie ({V.adKeyword} {ville || dep?.nom || "…"}).</p>
+            </div>
           </div>
         </div>
 
