@@ -18,9 +18,9 @@ export default function ProtectedLayout({
     <FicheProvider>
       <RecordingProvider>
       <div className="min-h-screen bg-paper text-ink">
-        <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <div className="md:grid md:grid-cols-[224px_1fr] md:gap-8">
-            <aside className="sticky top-0 z-20 -mx-4 border-b border-line bg-paper/90 px-4 py-3 backdrop-blur md:mx-0 md:max-h-screen md:border-b-0 md:px-0 md:py-7">
+        <div className="mx-auto max-w-[1400px] px-5 md:px-10">
+          <div className="md:grid md:grid-cols-[228px_1fr] md:gap-10">
+            <aside className="sticky top-0 z-20 -mx-5 border-b border-line bg-paper/90 px-5 py-3 backdrop-blur md:mx-0 md:max-h-screen md:border-b-0 md:px-0 md:py-7">
               <Link
                 href="/crm"
                 className="mb-4 hidden items-center gap-2.5 px-3.5 font-display text-lg font-bold tracking-tight md:flex"
