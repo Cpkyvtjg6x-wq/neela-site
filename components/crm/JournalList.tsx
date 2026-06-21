@@ -1,17 +1,14 @@
 "use client";
 
 import { Mic } from "lucide-react";
-import type { Call } from "@/lib/crm";
+import type { Call, Prospect } from "@/lib/crm";
 import { outcomeLabel, interetMeta } from "@/lib/crm";
 import Tag from "./Tag";
 import { useFiche } from "./FicheModal";
 
 export type JournalItem = {
   call: Call;
-  prospectId: string;
-  nom: string;
-  ville: string | null;
-  interet: string | null;
+  prospect: Prospect;
   count: number;
 };
 
@@ -26,13 +23,14 @@ export default function JournalList({ groups }: { groups: JournalGroup[] }) {
         <div key={g.day}>
           <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-mut">{g.day}</h2>
           <div className="space-y-2.5">
-            {g.items.map(({ call: c, prospectId, nom, ville, interet, count }) => {
+            {g.items.map(({ call: c, prospect, count }) => {
+              const { nom, ville, interet } = prospect;
               const im = interetMeta(interet);
               return (
                 <button
                   key={c.id}
                   type="button"
-                  onClick={() => open(prospectId)}
+                  onClick={() => open(prospect.id, prospect)}
                   className="block w-full rounded-2xl border border-line bg-white p-4 text-left transition-colors hover:border-ink"
                 >
                   <div className="flex items-center gap-3">
@@ -40,7 +38,7 @@ export default function JournalList({ groups }: { groups: JournalGroup[] }) {
                       className="h-2.5 w-2.5 shrink-0 rounded-full"
                       style={{ background: im?.color ?? "#cbd5e1" }}
                     />
-                    <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{nom}</span>
+                    <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{nom ?? "Prospect"}</span>
                     <span className="shrink-0 rounded-full bg-paper px-2.5 py-0.5 text-[12px] font-medium text-mut">
                       {outcomeLabel(c.outcome)}
                     </span>

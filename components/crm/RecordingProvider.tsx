@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { Mic } from "lucide-react";
+import type { Prospect } from "@/lib/crm";
 import { useFiche } from "./FicheModal";
 
 // Format mm:ss à partir d'une durée en millisecondes.
@@ -252,7 +253,9 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
       {showBubble && (
         <button
           type="button"
-          onClick={() => prospectId && open(prospectId)}
+          onClick={() =>
+            prospectId && open(prospectId, { id: prospectId, nom: prospectName } as Prospect)
+          }
           title="Revenir à l'enregistrement en cours"
           className="fixed right-4 top-4 z-[60] flex items-center gap-2.5 rounded-full border border-line bg-white/95 px-3.5 py-2 shadow-lg backdrop-blur transition-colors hover:border-ink"
         >

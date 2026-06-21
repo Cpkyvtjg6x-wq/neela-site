@@ -31,10 +31,7 @@ export default async function JournalPage() {
     if (!g) { g = { day: k, items: [] }; groups.push(g); }
     g.items.push({
       call: c,
-      prospectId: p.id,
-      nom: p.nom ?? "Prospect",
-      ville: p.ville,
-      interet: p.interet,
+      prospect: p,
       count: counts.get(c.prospect_id) ?? 1,
     });
   }

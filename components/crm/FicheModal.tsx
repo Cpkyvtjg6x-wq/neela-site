@@ -2,36 +2,48 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import type { Prospect, Call } from "@/lib/crm";
 import { statutLabel, interetMeta, outcomeLabel } from "@/lib/crm";
+import { EASE } from "@/lib/site";
 import { getProspectDetail } from "@/app/crm/actions";
 import InteractionForm from "./InteractionForm";
 import Tag from "./Tag";
 
 type Detail = { prospect: Prospect; calls: Call[]; audio: Record<string, string> };
 
-type Ctx = { open: (id: string) => void; close: () => void; openId: string | null };
-const FicheCtx = createContext<Ctx>({ open: () => {}, close: () => {}, openId: null });
+type Ctx = {
+  open: (id: string, seed?: Prospect | null) => void;
+  close: () => void;
+  openId: string | null;
+  openSeed: Prospect | null;
+};
+const FicheCtx = createContext<Ctx>({ open: () => {}, close: () => {}, openId: null, openSeed: null });
 export const useFiche = () => useContext(FicheCtx);
 
 export function FicheProvider({ children }: { children: ReactNode }) {
-  const [id, setId] = useState<string | null>(null);
-  const open = useCallback((i: string) => setId(i), []);
-  const close = useCallback(() => setId(null), []);
+  const [state, setState] = useState<{ id: string; seed: Prospect | null } | null>(null);
+  const open = useCallback((id: string, seed?: Prospect | null) => setState({ id, seed: seed ?? null }), []);
+  const close = useCallback(() => setState(null), []);
   return (
-    <FicheCtx.Provider value={{ open, close, openId: id }}>
+    <FicheCtx.Provider
+      value={{ open, close, openId: state?.id ?? null, openSeed: state?.seed ?? null }}
+    >
       {children}
     </FicheCtx.Provider>
   );
 }
 
-// La modale est rendue séparément du provider pour pouvoir être placée
+// La modale est rendue séparément du provider pour être placée
 // À L'INTÉRIEUR de <RecordingProvider> (le formulaire utilise useRecorder()).
 export function FicheModalHost() {
-  const { openId, close } = useFiche();
-  if (!openId) return null;
-  return <FicheModal id={openId} onClose={close} />;
+  const { openId, openSeed, close } = useFiche();
+  return (
+    <AnimatePresence>
+      {openId && <FicheModal key={openId} id={openId} seed={openSeed} onClose={close} />}
+    </AnimatePresence>
+  );
 }
 
 function fmt(d: string | null) {
@@ -42,19 +54,22 @@ function fmt(d: string | null) {
   });
 }
 
-function FicheModal({ id, onClose }: { id: string; onClose: () => void }) {
+function FicheModal({
+  id,
+  seed,
+  onClose,
+}: {
+  id: string;
+  seed: Prospect | null;
+  onClose: () => void;
+}) {
   const [data, setData] = useState<Detail | null>(null);
-  const [loading, setLoading] = useState(true);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
     getProspectDetail(id).then((d) => {
-      if (active) {
-        setData(d as Detail | null);
-        setLoading(false);
-      }
+      if (active) setData(d as Detail | null);
     });
     return () => {
       active = false;
@@ -76,19 +91,33 @@ function FicheModal({ id, onClose }: { id: string; onClose: () => void }) {
     };
   }, [onClose]);
 
-  const p = data?.prospect;
+  // On affiche tout de suite les infos déjà connues (seed) ; le détail (appels) arrive ensuite.
+  const p = data?.prospect ?? seed ?? null;
+  const calls = data?.calls ?? [];
+  const audio = data?.audio ?? {};
   const im = p ? interetMeta(p.interet) : undefined;
+  const notFound = data !== null && !data.prospect && !seed;
 
   return (
-    <div
+    <motion.div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-3 sm:p-6"
       role="dialog"
       aria-modal="true"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative my-4 w-full max-w-3xl rounded-2xl bg-paper shadow-2xl">
+      <motion.div
+        className="relative my-4 w-full max-w-3xl rounded-2xl bg-paper shadow-2xl"
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 12, scale: 0.98 }}
+        transition={{ duration: 0.24, ease: EASE }}
+      >
         <button
           ref={closeRef}
           onClick={onClose}
@@ -98,10 +127,10 @@ function FicheModal({ id, onClose }: { id: string; onClose: () => void }) {
           <X size={18} />
         </button>
 
-        {loading ? (
-          <div className="p-10 text-center text-sm text-mut">Chargement…</div>
-        ) : !p ? (
+        {notFound ? (
           <div className="p-10 text-center text-sm text-mut">Prospect introuvable.</div>
+        ) : !p ? (
+          <div className="p-10 text-center text-sm text-mut">Chargement…</div>
         ) : (
           <div className="p-5 sm:p-6">
             {/* En-tête */}
@@ -139,12 +168,18 @@ function FicheModal({ id, onClose }: { id: string; onClose: () => void }) {
             <InteractionForm prospectId={p.id} prospectName={p.nom} onSaved={onClose} />
 
             {/* Historique compact */}
-            {data!.calls.length > 0 && (
-              <div className="mt-5">
-                <h3 className="mb-2 font-display text-sm font-bold">Historique ({data!.calls.length})</h3>
+            <div className="mt-5">
+              <h3 className="mb-2 font-display text-sm font-bold">
+                Historique{data ? ` (${calls.length})` : ""}
+              </h3>
+              {!data ? (
+                <p className="text-[12.5px] text-mut">Chargement de l'historique…</p>
+              ) : calls.length === 0 ? (
+                <p className="text-[12.5px] text-mut">Aucun appel encore enregistré.</p>
+              ) : (
                 <div className="space-y-2">
-                  {data!.calls.slice(0, 8).map((c) => {
-                    const url = data!.audio[c.id];
+                  {calls.slice(0, 8).map((c) => {
+                    const url = audio[c.id];
                     return (
                       <div key={c.id} className="rounded-xl border border-line bg-white p-3">
                         <div className="flex items-center justify-between">
@@ -162,8 +197,8 @@ function FicheModal({ id, onClose }: { id: string; onClose: () => void }) {
                     );
                   })}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             <div className="mt-4 text-right">
               <Link href={`/crm/prospect/${p.id}`} onClick={onClose} className="text-xs text-accent hover:underline">
@@ -172,7 +207,7 @@ function FicheModal({ id, onClose }: { id: string; onClose: () => void }) {
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

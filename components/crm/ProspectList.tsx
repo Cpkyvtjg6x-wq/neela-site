@@ -141,7 +141,7 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => open(p.id)}
+                    onClick={() => open(p.id, p)}
                     className={`flex w-full items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-paper ${
                       i > 0 ? "border-t border-line" : ""
                     }`}
