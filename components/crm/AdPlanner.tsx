@@ -363,9 +363,9 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[330px_minmax(0,1fr)]">
         {/* Réglages */}
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <div className={card}>
             <h2 className="mb-4 font-display text-base font-bold">{mode === "objectif" ? "Ton objectif" : "Le budget pub"}</h2>
             {mode === "objectif"
@@ -402,7 +402,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
         </div>
 
         {/* Résultats */}
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {/* viabilité */}
           <div className={`flex items-start gap-3 rounded-2xl border p-4 ${tone[viab.c]}`}>
             {viab.c === "emerald" ? <CheckCircle2 size={20} className="mt-0.5 shrink-0" /> : <AlertTriangle size={20} className="mt-0.5 shrink-0" />}
