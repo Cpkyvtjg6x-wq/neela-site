@@ -99,20 +99,26 @@ function FicheModal({
   const notFound = data !== null && !data.prospect && !seed;
 
   return (
-    <motion.div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-3 sm:p-6"
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-3 sm:p-6"
       role="dialog"
       aria-modal="true"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.22, ease: EASE }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
+      {/* Fond sombre — élément FRÈRE du panneau (et non parent) pour éviter
+          l'effet de groupe d'opacité qui faisait varier l'ombrage. */}
       <motion.div
-        className="relative my-4 w-full max-w-3xl rounded-2xl bg-paper shadow-2xl"
+        className="fixed inset-0 bg-black/40"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.22, ease: EASE }}
+        onClick={onClose}
+      />
+      <motion.div
+        className="relative z-10 my-4 w-full max-w-3xl rounded-2xl bg-paper shadow-2xl"
         initial={{ opacity: 0, y: 16, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -208,6 +214,6 @@ function FicheModal({
           </div>
         )}
       </motion.div>
-    </motion.div>
+    </div>
   );
 }
