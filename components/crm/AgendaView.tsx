@@ -15,6 +15,7 @@ export type AgendaItem = {
   status: string; // "reserve" | "honore" | ...
   prospect: Prospect | null;
   phone: string | null;
+  tags?: string[] | null;
 };
 
 const PARIS = "Europe/Paris";

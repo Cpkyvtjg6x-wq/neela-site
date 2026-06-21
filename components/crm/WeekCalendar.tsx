@@ -3,13 +3,15 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Check, X, Phone, RotateCcw, ExternalLink } from "lucide-react";
 import type { Prospect } from "@/lib/crm";
+import { tagColor } from "@/lib/crm";
 import { updateAppointmentStatus } from "@/app/crm/actions";
 import { useFiche } from "./FicheModal";
 import type { AgendaItem } from "./AgendaView";
 
 const PARIS = "Europe/Paris";
 const PX = 58; // hauteur d'une heure (px)
-const DEFAULT_DUR = 30; // durée par défaut (min)
+const DEFAULT_DUR = 45; // durée par défaut (min)
+const MIN_H = 42; // hauteur minimale d'un bloc (px) pour rester lisible
 
 function parisParts(d: Date): { key: string; min: number } {
   const f = new Intl.DateTimeFormat("en-GB", {
@@ -85,6 +87,17 @@ const STYLE = {
   done: { bg: "#F1F5F9", bar: "#94A3B8", tx: "#64748B" },
 };
 
+// Couleur d'un évènement : d'abord son 1er tag, sinon le type (RDV / rappel).
+function colorFor(item: AgendaItem): { bg: string; bar: string; tx: string } {
+  if (item.status === "honore") return STYLE.done;
+  const tag = item.tags && item.tags.length ? item.tags[0] : null;
+  if (tag) {
+    const c = tagColor(tag);
+    return { bg: c.bg, bar: c.text, tx: c.text };
+  }
+  return item.type === "rdv" ? STYLE.rdv : STYLE.rappel;
+}
+
 export default function WeekCalendar({
   items,
   nowISO,
@@ -134,6 +147,16 @@ export default function WeekCalendar({
       m.get(k)!.push(it);
     }
     return m;
+  }, [items]);
+
+  // Légende : tags distincts présents (avec leur couleur), repli sur RDV/Rappel.
+  const tagLegend = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const it of items) {
+      const t = it.tags && it.tags.length ? it.tags[0] : null;
+      if (t && !m.has(t)) m.set(t, tagColor(t).text);
+    }
+    return [...m.entries()].slice(0, 6);
   }, [items]);
 
   const move = (n: number) => setCursor((c) => addDays(c, n * days));
@@ -219,17 +242,11 @@ export default function WeekCalendar({
             const weekend = wd === 0 || wd === 6;
             const showNow = isToday && nowVisible;
             return (
-              <div key={key} className={`relative border-l border-line ${weekend ? "bg-paper/40" : ""} ${isToday ? "bg-accent/[0.04]" : ""}`}>
-                {/* lignes d'heures + demi-heures */}
-                {hours.map((h, i) => (
-                  <div key={h}>
-                    {i !== 0 && (
-                      <div className="absolute inset-x-0" style={{ top: (h - hourStart) * PX, borderTop: "1px solid rgba(10,10,10,0.06)" }} />
-                    )}
-                    <div className="absolute inset-x-0" style={{ top: (h - hourStart) * PX + PX / 2, borderTop: "1px solid rgba(10,10,10,0.03)" }} />
-                  </div>
-                ))}
-
+              <div
+                key={key}
+                className={`relative ${weekend ? "bg-paper/40" : ""} ${isToday ? "bg-accent/[0.04]" : ""}`}
+                style={{ borderLeft: "1px solid rgba(10,10,10,0.05)" }}
+              >
                 {placed.map((pl) => (
                   <EventBlock
                     key={pl.item.id}
@@ -253,9 +270,19 @@ export default function WeekCalendar({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-4 border-t border-line px-4 py-2.5 text-xs text-mut">
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: STYLE.rdv.bar }} /> Rendez-vous</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: STYLE.rappel.bar }} /> Rappel</span>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line px-4 py-2.5 text-xs text-mut">
+        {tagLegend.length > 0 ? (
+          tagLegend.map(([tag, color]) => (
+            <span key={tag} className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full" style={{ background: color }} /> {tag}
+            </span>
+          ))
+        ) : (
+          <>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: STYLE.rdv.bar }} /> Rendez-vous</span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: STYLE.rappel.bar }} /> Rappel</span>
+          </>
+        )}
       </div>
 
       {pop && (
@@ -284,12 +311,12 @@ function EventBlock({
   onClick: (e: React.MouseEvent) => void;
 }) {
   const top = ((pl.startMin - hourStart * 60) / 60) * PX;
-  const height = Math.max(((pl.endMin - pl.startMin) / 60) * PX - 3, 22);
+  const height = Math.max(((pl.endMin - pl.startMin) / 60) * PX - 3, MIN_H);
   const width = `calc(${100 / pl.lanes}% - 5px)`;
   const left = `calc(${(100 / pl.lanes) * pl.lane}% + 3px)`;
   const done = pl.item.status === "honore";
   const overdue = pl.item.status === "reserve" && new Date(pl.item.start) < now;
-  const s = done ? STYLE.done : pl.item.type === "rdv" ? STYLE.rdv : STYLE.rappel;
+  const s = colorFor(pl.item);
   const tall = height > 34;
 
   return (
@@ -339,7 +366,7 @@ function Popover({
   const top = Math.min(pop.y + 8, vh - 230);
   const done = item.status === "honore";
   const start = new Date(item.start);
-  const bar = item.type === "rdv" ? STYLE.rdv.bar : STYLE.rappel.bar;
+  const bar = colorFor(item).bar;
 
   return (
     <>

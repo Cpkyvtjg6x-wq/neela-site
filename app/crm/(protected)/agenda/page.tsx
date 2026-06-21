@@ -23,6 +23,7 @@ export default async function AgendaPage() {
         status: a.status,
         prospect: p,
         phone: a.phone || p?.telephone || null,
+        tags: p?.tags ?? null,
       };
     });
 
