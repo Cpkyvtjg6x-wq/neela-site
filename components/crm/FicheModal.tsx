@@ -22,9 +22,16 @@ export function FicheProvider({ children }: { children: ReactNode }) {
   return (
     <FicheCtx.Provider value={{ open, close, openId: id }}>
       {children}
-      {id && <FicheModal id={id} onClose={close} />}
     </FicheCtx.Provider>
   );
+}
+
+// La modale est rendue séparément du provider pour pouvoir être placée
+// À L'INTÉRIEUR de <RecordingProvider> (le formulaire utilise useRecorder()).
+export function FicheModalHost() {
+  const { openId, close } = useFiche();
+  if (!openId) return null;
+  return <FicheModal id={openId} onClose={close} />;
 }
 
 function fmt(d: string | null) {

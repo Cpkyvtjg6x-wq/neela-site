@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isAuthed } from "@/lib/auth";
 import Sidebar from "@/components/crm/Sidebar";
-import { FicheProvider } from "@/components/crm/FicheModal";
+import { FicheProvider, FicheModalHost } from "@/components/crm/FicheModal";
 import { RecordingProvider } from "@/components/crm/RecordingProvider";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +34,7 @@ export default function ProtectedLayout({
           </div>
         </div>
       </div>
+      <FicheModalHost />
       </RecordingProvider>
     </FicheProvider>
   );
