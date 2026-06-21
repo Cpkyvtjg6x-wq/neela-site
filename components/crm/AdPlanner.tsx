@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Target, Wallet, ShieldCheck, Gauge, Rocket, AlertTriangle, CheckCircle2, MapPin, FileDown, TrendingUp } from "lucide-react";
+import { Target, Wallet, ShieldCheck, Gauge, Rocket, AlertTriangle, CheckCircle2, MapPin, FileDown, TrendingUp, Sliders, Layers } from "lucide-react";
 
 const eur = (n: number) => Math.round(n).toLocaleString("fr-FR") + " €";
 const num = (n: number) => Math.round(n).toLocaleString("fr-FR");
@@ -170,6 +170,31 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   const paybackIdx = cumProfit.findIndex((v) => v >= 0);
   const cum12 = cumProfit[11];
 
+  // Bande de confiance : profit cumulé prudent ↔ optimiste, à budget mensuel constant.
+  const cumForAssum = (assum: Assum) => {
+    let a = 0;
+    return cumProfit.map((_, i) =>
+      (a += compute(assum, { ...ctx, mode: "budget", budget: regimeBudget, period: i < 2 ? "apprentissage" : "regime" }).profit)
+    );
+  };
+  const cumLow = cumForAssum(SCENARIOS.prudent);
+  const cumHigh = cumForAssum(SCENARIOS.optimiste);
+
+  // Optimiseur de budget : profit mensuel (régime) selon le budget pub.
+  const sweep: { b: number; p: number }[] = [];
+  for (let b = 300; b <= 5000; b += 100) {
+    sweep.push({ b, p: compute(cur, { ...ctx, mode: "budget", budget: b, period: "regime" }).profit });
+  }
+  const best = sweep.reduce((a, c) => (c.p > a.p ? c : a), sweep[0]);
+
+  // 3 paliers d'offre, dérivés du budget de régime.
+  const baseB = Math.max(300, Math.round(regimeBudget / 50) * 50);
+  const tiers = [
+    { name: "Essentiel", b: Math.max(300, Math.round((baseB * 0.7) / 50) * 50), reco: false },
+    { name: "Croissance", b: baseB, reco: true },
+    { name: "Performance", b: Math.round((baseB * 1.6) / 50) * 50, reco: false },
+  ].map((t) => ({ ...t, res: compute(cur, { ...ctx, mode: "budget", budget: t.b, period: "regime" }) }));
+
   // viabilité
   const viab = r.leads >= 30
     ? { c: "emerald", t: "Budget viable", d: "Assez de volume pour que Meta apprenne et se stabilise." }
@@ -205,6 +230,9 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   // ---- Export proposition (page imprimable / PDF) ----
   function exportProposal() {
     const nom = centreName.trim() || "votre centre";
+    const tiersRows = tiers
+      .map((t) => `<tr><td>${t.name}${t.reco ? " ★" : ""} — ${eur(t.b)}/mois pub</td><td>${num(t.res.rdv)} RDV · ${eur(t.res.margeGen)} marge · ×${num1(t.res.roas)}</td></tr>`)
+      .join("");
     const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Proposition Neela — ${nom}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -245,6 +273,9 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
     <tr><td>Profit net cumulé à 12 mois</td><td>${eur(cum12)}</td></tr>
   </table>
 
+  <h3 style="font-size:16px;margin:24px 0 6px">3 formules au choix</h3>
+  <table>${tiersRows}</table>
+
   <div class="panel">
     Budget pub recommandé : <b>${eur(r.budgetPub)}/mois</b> + honoraires Neela <b>${eur(fee)}/mois</b>.
     Objectif : <b>~${num(r.rdv)}</b> rendez-vous et <b>~${num1(r.ventes)} ${V.ventes}</b> par mois,
@@ -260,16 +291,22 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
     w.document.close();
   }
 
-  // ---- Mini graphe projection 12 mois (SVG) ----
+  // ---- Mini graphe projection 12 mois (SVG) avec bande de confiance ----
   const CW = 560, CH = 150, PADL = 8, PADR = 8, PADT = 14, PADB = 18;
-  const minV = Math.min(0, ...cumProfit), maxV = Math.max(0, ...cumProfit);
+  const cvals = [0, ...cumProfit, ...cumLow, ...cumHigh];
+  const minV = Math.min(...cvals), maxV = Math.max(...cvals);
   const xAt = (i: number) => PADL + (i / 11) * (CW - PADL - PADR);
-  const yAt = (v: number) => {
-    const t = (v - minV) / ((maxV - minV) || 1);
-    return PADT + (1 - t) * (CH - PADT - PADB);
-  };
+  const yAt = (v: number) => PADT + (1 - (v - minV) / ((maxV - minV) || 1)) * (CH - PADT - PADB);
   const linePath = cumProfit.map((v, i) => `${i ? "L" : "M"} ${xAt(i).toFixed(1)} ${yAt(v).toFixed(1)}`).join(" ");
-  const areaPath = `${linePath} L ${xAt(11).toFixed(1)} ${yAt(minV).toFixed(1)} L ${xAt(0).toFixed(1)} ${yAt(minV).toFixed(1)} Z`;
+  const bandTop = cumHigh.map((v, i) => `${i ? "L" : "M"} ${xAt(i).toFixed(1)} ${yAt(v).toFixed(1)}`).join(" ");
+  const bandPath = bandTop + " " + cumLow.map((v, i) => ({ v, i })).reverse().map(({ v, i }) => `L ${xAt(i).toFixed(1)} ${yAt(v).toFixed(1)}`).join(" ") + " Z";
+
+  // ---- Échelles de l'optimiseur de budget ----
+  const OW = 560, OH = 120, OPL = 8, OPR = 8, OPT = 12, OPB = 18;
+  const oMin = Math.min(0, ...sweep.map((s) => s.p)), oMax = Math.max(0, ...sweep.map((s) => s.p));
+  const oX = (b: number) => OPL + ((b - 300) / (5000 - 300)) * (OW - OPL - OPR);
+  const oY = (p: number) => OPT + (1 - (p - oMin) / ((oMax - oMin) || 1)) * (OH - OPT - OPB);
+  const oPath = sweep.map((s, i) => `${i ? "L" : "M"} ${oX(s.b).toFixed(1)} ${oY(s.p).toFixed(1)}`).join(" ");
 
   return (
     <div>
@@ -407,10 +444,10 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
                 {paybackIdx >= 0 ? `Rentabilisé au mois ${paybackIdx + 1}` : "Payback > 12 mois"}
               </span>
             </div>
-            <p className="mb-3 text-xs text-mut">Profit net cumulé (les 2 premiers mois d'apprentissage coûtent, puis ça décolle).</p>
-            <svg viewBox={`0 0 ${CW} ${CH}`} className="w-full" role="img" aria-label="Courbe de profit cumulé sur 12 mois">
+            <p className="mb-3 text-xs text-mut">Profit net cumulé (les 2 premiers mois d'apprentissage coûtent, puis ça décolle). La zone bleue = fourchette prudent → optimiste.</p>
+            <svg viewBox={`0 0 ${CW} ${CH}`} className="w-full" role="img" aria-label="Courbe de profit cumulé sur 12 mois avec fourchette">
               <line x1={PADL} y1={yAt(0)} x2={CW - PADR} y2={yAt(0)} stroke="rgba(10,10,10,0.18)" strokeWidth="1" strokeDasharray="3 3" />
-              <path d={areaPath} fill="rgba(37,99,235,0.10)" />
+              <path d={bandPath} fill="rgba(37,99,235,0.12)" />
               <path d={linePath} fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
               {paybackIdx >= 0 && (
                 <g>
@@ -426,6 +463,49 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
               <span className="text-mut">Profit cumulé à 12 mois : <b className={cum12 >= 0 ? "text-emerald-600" : "text-red-600"}>{eur(cum12)}</b></span>
               <span className="text-mut">Budget mensuel projeté : <b className="text-ink">{eur(regimeBudget)}</b></span>
             </div>
+          </div>
+
+          {/* Optimiseur de budget */}
+          <div className={card}>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <h2 className="flex items-center gap-2 font-display text-base font-bold"><Sliders size={16} className="text-accent" /> Optimiseur de budget</h2>
+              <button onClick={() => { setMode("budget"); setBudget(best.b); }}
+                className="shrink-0 rounded-full border border-accent px-3 py-1 text-[11px] font-semibold text-accent hover:bg-accent hover:text-white">
+                Adopter {eur(best.b)}
+              </button>
+            </div>
+            <p className="mb-3 text-xs text-mut">Profit mensuel selon le budget. Optimum estimé : <b className="text-ink">{eur(best.b)}/mois</b> → <b className="text-emerald-600">{eur(best.p)}</b> de profit.</p>
+            <svg viewBox={`0 0 ${OW} ${OH}`} className="w-full" role="img" aria-label="Profit selon le budget pub">
+              <line x1={OPL} y1={oY(0)} x2={OW - OPR} y2={oY(0)} stroke="rgba(10,10,10,0.18)" strokeWidth="1" strokeDasharray="3 3" />
+              <path d={oPath} fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+              <line x1={oX(best.b)} y1={OPT} x2={oX(best.b)} y2={OH - OPB} stroke="#059669" strokeWidth="1" strokeDasharray="2 2" />
+              <circle cx={oX(best.b)} cy={oY(best.p)} r="4" fill="#059669" />
+              {[300, 1500, 3000, 5000].map((b) => (
+                <text key={b} x={oX(b)} y={OH - 4} fontSize="9" textAnchor="middle" fill="#6B7280">{b >= 1000 ? b / 1000 + "k" : b}€</text>
+              ))}
+            </svg>
+          </div>
+
+          {/* 3 formules */}
+          <div className={card}>
+            <h2 className="mb-1 flex items-center gap-2 font-display text-base font-bold"><Layers size={16} className="text-accent" /> 3 formules à proposer</h2>
+            <p className="mb-4 text-xs text-mut">Même accompagnement, plus de budget = plus de résultats. Le palier du milieu est recommandé.</p>
+            <div className="grid grid-cols-3 gap-3">
+              {tiers.map((t) => (
+                <div key={t.name} className={`rounded-2xl border p-4 ${t.reco ? "border-accent bg-accent/5" : "border-line"}`}>
+                  {t.reco && <span className="mb-2 inline-block rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-white">Recommandé</span>}
+                  <p className="font-display text-base font-bold">{t.name}</p>
+                  <p className="mt-1 font-display text-xl font-bold text-accent">{eur(t.b)}<span className="text-[11px] font-medium text-mut"> /mois</span></p>
+                  <ul className="mt-3 space-y-1.5 text-[12px] text-mut">
+                    <li><b className="text-ink">{num(t.res.rdv)}</b> RDV/mois</li>
+                    <li><b className="text-ink">{num1(t.res.ventes)}</b> {V.ventes}</li>
+                    <li><b className="text-ink">{eur(t.res.margeGen)}</b> marge</li>
+                    <li>Retour <b className="text-emerald-600">×{num1(t.res.roas)}</b></li>
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-[11px] text-mut">Honoraires Neela {eur(fee)}/mois inclus. Budgets versés à Meta.</p>
           </div>
 
           {/* funnel */}
@@ -472,6 +552,29 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
               {r.ventes >= r.breakEven
                 ? `Rentable dès la ${Math.ceil(r.breakEven)}ᵉ vente — l'objectif (~${num1(r.ventes)}) la dépasse.`
                 : `Attention : à ces hypothèses, l'objectif (~${num1(r.ventes)} ventes) ne couvre pas encore le coût (seuil ${Math.ceil(r.breakEven)}).`}
+            </p>
+          </div>
+
+          {/* Sans pub vs avec Neela */}
+          <div className={card}>
+            <h2 className="mb-3 font-display text-base font-bold">Sans pub vs avec Neela</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-line bg-paper p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-mut">Sans campagne</p>
+                <p className="mt-2 font-display text-2xl font-bold text-mut">0</p>
+                <p className="text-[12px] text-mut">RDV générés / mois</p>
+                <p className="mt-2 text-[12px] text-mut">La demande part chez les concurrents.</p>
+              </div>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Avec Neela</p>
+                <p className="mt-2 font-display text-2xl font-bold text-emerald-700">+{num(r.rdv)}</p>
+                <p className="text-[12px] text-emerald-700/80">RDV générés / mois</p>
+                <p className="mt-2 text-[12px] text-emerald-700/80">+{eur(r.margeGen)} de marge / mois</p>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-mut">
+              Chaque mois sans campagne ≈ <b className="text-ink">{eur(r.margeGen)}</b> de marge laissée à la concurrence,
+              soit ~<b className="text-ink">{eur(r.margeGen * 12)}</b> sur l'année.
             </p>
           </div>
 
