@@ -244,6 +244,11 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
     : { c: "red", t: "Budget trop faible", d: "Pas assez de signal : Meta n'optimise pas, rendement aléatoire." };
   const minBudget = 30 * cpl;
 
+  // Honoraires recommandés (rester concurrentiel) : ~25 % de la marge générée, bornés.
+  const feeReco = Math.round(Math.min(2500, Math.max(600, 0.25 * r.margeGen)) / 10) * 10;
+  const feeLow = Math.round(Math.max(500, 0.18 * r.margeGen) / 10) * 10;
+  const feeHigh = Math.round(Math.min(3000, 0.3 * r.margeGen) / 10) * 10;
+
   const zone = r.util <= 0.7
     ? { c: "emerald", t: "Zone confortable" }
     : r.util <= 1
@@ -432,6 +437,10 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
               <Slider label={V.margePremiumLabel} value={margeC2} set={setMargeC2} min={50} max={3000} step={50} suffix=" €" />
               <Slider label={V.margeBaseLabel} value={margeC1} set={setMargeC1} min={0} max={1000} step={25} suffix=" €" />
               <Slider label="Tes honoraires / mois" value={fee} set={setFee} min={300} max={3000} step={10} suffix=" €" />
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-accent/30 bg-accent/5 p-3 text-xs">
+              <span className="text-mut">Honoraires recommandés pour rester concurrentiel : <b className="text-ink">{eur(feeReco)}</b> · fourchette {eur(feeLow)}–{eur(feeHigh)}</span>
+              <button onClick={() => setFee(feeReco)} className="ml-auto rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-white hover:opacity-90">Appliquer</button>
             </div>
           </div>
 
