@@ -1,5 +1,6 @@
 import { getAppointments, getAllProspects, indexProspects } from "@/lib/crmData";
-import AgendaView, { type AgendaItem } from "@/components/crm/AgendaView";
+import AgendaTabs from "@/components/crm/AgendaTabs";
+import type { AgendaItem } from "@/components/crm/AgendaView";
 import { addAppointment } from "@/app/crm/actions";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ export default async function AgendaPage() {
       return {
         id: a.id,
         start: a.start_at,
+        end: a.end_at,
         title: a.name || p?.nom || "Rendez-vous",
         type: isRappel ? ("rappel" as const) : ("rdv" as const),
         status: a.status,
@@ -34,7 +36,7 @@ export default async function AgendaPage() {
     <div>
       <h1 className="mb-6 font-display text-2xl font-bold tracking-tight">Agenda</h1>
 
-      <AgendaView items={items} nowISO={nowISO} />
+      <AgendaTabs items={items} nowISO={nowISO} />
 
       <details className="mt-6 rounded-2xl border border-line bg-white p-5">
         <summary className="cursor-pointer font-display text-lg font-bold">Ajouter un rendez-vous</summary>

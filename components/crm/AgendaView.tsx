@@ -9,6 +9,7 @@ import { useFiche } from "./FicheModal";
 export type AgendaItem = {
   id: string;
   start: string; // ISO
+  end?: string | null; // ISO (fin du créneau, optionnel)
   title: string;
   type: "rdv" | "rappel";
   status: string; // "reserve" | "honore" | ...
