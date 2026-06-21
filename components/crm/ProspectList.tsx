@@ -13,7 +13,7 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
   const [interet, setInteret] = useState("");
   const [statut, setStatut] = useState("");
   const [groupBy, setGroupBy] = useState<"" | "region" | "departement" | "ville">("region");
-  const [sortBy, setSortBy] = useState<"priorite" | "nom" | "recent">("priorite");
+  const [sortBy, setSortBy] = useState<"priorite" | "nom" | "recent" | "departement">("priorite");
 
   const depts = useMemo(
     () =>
@@ -37,6 +37,11 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
     arr.sort((a, b) => {
       if (sortBy === "nom") return (a.nom ?? "").localeCompare(b.nom ?? "");
       if (sortBy === "recent") return +new Date(b.created_at) - +new Date(a.created_at);
+      if (sortBy === "departement") {
+        const cmp = (a.departement ?? "").localeCompare(b.departement ?? "", undefined, { numeric: true });
+        if (cmp !== 0) return cmp;
+        return prospectScore(b) - prospectScore(a);
+      }
       return prospectScore(b) - prospectScore(a);
     });
     return arr;
@@ -100,10 +105,11 @@ export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
         </select>
         <select
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as "priorite" | "nom" | "recent")}
+          onChange={(e) => setSortBy(e.target.value as "priorite" | "nom" | "recent" | "departement")}
           className={inputCls}
         >
           <option value="priorite">Tri : priorité</option>
+          <option value="departement">Tri : département</option>
           <option value="nom">Tri : nom A→Z</option>
           <option value="recent">Tri : récents</option>
         </select>
