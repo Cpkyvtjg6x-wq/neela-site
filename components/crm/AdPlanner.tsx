@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { Target, Wallet, ShieldCheck, Gauge, Rocket, AlertTriangle, CheckCircle2, MapPin, FileDown, TrendingUp, Sliders, Layers, Search } from "lucide-react";
-import { FR_DEPTS } from "@/lib/frDepartements";
+
+type Commune = { nom: string; codeDepartement: string; departement?: { nom: string; code: string }; population: number };
 
 const eur = (n: number) => Math.round(n).toLocaleString("fr-FR") + " €";
 const num = (n: number) => Math.round(n).toLocaleString("fr-FR");
@@ -138,9 +139,9 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
 
   const [centreName, setCentreName] = useState("");
 
-  const [dept, setDept] = useState("");
-  const [scope, setScope] = useState<"commune" | "agglo" | "departement">("agglo");
-  const [ville, setVille] = useState("");
+  const [cityQuery, setCityQuery] = useState("");
+  const [citySug, setCitySug] = useState<Commune[]>([]);
+  const [city, setCity] = useState<Commune | null>(null);
   const [compLevel, setCompLevel] = useState<"faible" | "moyenne" | "forte">("moyenne");
 
   const V = METIERS[metier];
@@ -160,20 +161,34 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   const blendedMarge = (partC2 / 100) * margeC2 + (1 - partC2 / 100) * margeC1;
   const ceiling = pop55 * 0.005;
 
-  // Zone géographique
-  const dep = FR_DEPTS.find((d) => d.code === dept);
-  const scopeFrac = scope === "commune" ? 0.08 : scope === "agglo" ? 0.3 : 1;
-  const scopedPop = dep ? Math.round(dep.pop * scopeFrac) : 0;
+  // Zone géographique (depuis la ville sélectionnée)
+  const scopedPop = city?.population ?? 0;
   const estPop = Math.round(scopedPop * V.share);
-  const estCompetitors = dep ? Math.max(1, Math.round(scopedPop / V.density)) : 0;
+  const estCompetitors = scopedPop ? Math.max(1, Math.round(scopedPop / V.density)) : 0;
   const applyZone = () => { if (estPop) setPop55(Math.min(200000, Math.max(1500, Math.round(estPop / 1000) * 1000))); };
 
   // Concurrence → multiplicateur de CPL
   const compMult = compLevel === "faible" ? 0.9 : compLevel === "forte" ? 1.25 : 1;
 
   // Lien vers la bibliothèque publicitaire Meta (pré-remplie)
-  const adKw = `${V.adKeyword} ${ville.trim() || dep?.nom || ""}`.trim();
+  const adKw = `${V.adKeyword} ${city?.nom || cityQuery.trim()}`.trim();
   const adLibUrl = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=FR&media_type=all&q=${encodeURIComponent(adKw)}&search_type=keyword_unordered`;
+
+  // Autocomplétion ville via l'API publique geo.api.gouv.fr (gratuite, sans clé).
+  useEffect(() => {
+    const q = cityQuery.trim();
+    if (q.length < 2 || (city && city.nom.toLowerCase() === q.toLowerCase())) { setCitySug([]); return; }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(q)}&fields=nom,codeDepartement,departement,population&boost=population&limit=6`);
+        const data = await res.json();
+        setCitySug(Array.isArray(data) ? data.filter((c: Commune) => c.population) : []);
+      } catch {
+        setCitySug([]);
+      }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [cityQuery, city]);
 
   const ctx: Ctx = { mode, targetRdv, budget, marge: blendedMarge, fee, ceiling, period, compMult };
   const cur: Assum = { cpl, leadToRdv, presence, closing };
@@ -423,23 +438,26 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
           <div className={card}>
             <h2 className="mb-3 flex items-center gap-2 font-display text-base font-bold"><MapPin size={16} className="text-accent" /> Zone &amp; concurrence</h2>
 
-            <div className="grid grid-cols-2 gap-2">
-              <select value={dept} onChange={(e) => setDept(e.target.value)}
-                className="rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent">
-                <option value="">Département…</option>
-                {FR_DEPTS.map((d) => <option key={d.code} value={d.code}>{d.code} · {d.nom}</option>)}
-              </select>
-              <select value={scope} onChange={(e) => setScope(e.target.value as "commune" | "agglo" | "departement")}
-                className="rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent">
-                <option value="commune">Commune</option>
-                <option value="agglo">Agglomération</option>
-                <option value="departement">Département</option>
-              </select>
+            <div className="relative">
+              <input value={cityQuery} onChange={(e) => { setCityQuery(e.target.value); setCity(null); }}
+                placeholder="Ville du centre (ex. La Rochelle)"
+                className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent" />
+              {citySug.length > 0 && (
+                <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-line bg-white shadow-card">
+                  {citySug.map((c) => (
+                    <button key={`${c.nom}-${c.codeDepartement}`} onClick={() => { setCity(c); setCityQuery(c.nom); setCitySug([]); }}
+                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-paper">
+                      <span className="truncate">{c.nom} <span className="text-mut">({c.codeDepartement})</span></span>
+                      <span className="shrink-0 text-xs text-mut">{num(c.population)} hab.</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {dep && (
+            {city && (
               <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-paper p-3 text-xs text-mut">
-                <span>Zone ≈ <b className="text-ink">{num(scopedPop)}</b> hab. · cible <b className="text-ink">{num(estPop)}</b> · ~<b className="text-ink">{estCompetitors}</b> concurrents estimés</span>
+                <span><b className="text-ink">{city.nom}</b>{city.departement ? ` · ${city.departement.nom}` : ""} · <b className="text-ink">{num(scopedPop)}</b> hab. · cible <b className="text-ink">{num(estPop)}</b> · ~<b className="text-ink">{estCompetitors}</b> concurrents</span>
                 <button onClick={applyZone} className="ml-auto rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-white hover:opacity-90">Appliquer</button>
               </div>
             )}
@@ -463,13 +481,11 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
             </div>
 
             <div className="mt-4">
-              <input value={ville} onChange={(e) => setVille(e.target.value)} placeholder="Ville (pour la recherche Meta)"
-                className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent" />
               <a href={adLibUrl} target="_blank" rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-sm font-semibold text-ink hover:border-accent hover:text-accent">
+                className="inline-flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-sm font-semibold text-ink hover:border-accent hover:text-accent">
                 <Search size={15} /> Voir les pubs Meta de la zone
               </a>
-              <p className="mt-1.5 text-[11px] text-mut">Ouvre la bibliothèque publicitaire officielle Meta, pré-remplie ({V.adKeyword} {ville || dep?.nom || "…"}).</p>
+              <p className="mt-1.5 text-[11px] text-mut">Ouvre la bibliothèque publicitaire officielle Meta, pré-remplie ({V.adKeyword} {city?.nom || cityQuery || "…"}).</p>
             </div>
           </div>
         </div>
