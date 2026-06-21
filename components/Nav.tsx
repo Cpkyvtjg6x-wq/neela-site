@@ -9,7 +9,6 @@ import { EASE } from "@/lib/site";
 const LINKS = [
   { href: "/services", label: "Services" },
   { href: "/realisations", label: "Réalisations" },
-  { href: "/contact", label: "Contact" },
 ];
 
 export default function Nav() {
@@ -117,6 +116,19 @@ export default function Nav() {
                   </Link>
                 </motion.div>
               ))}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.08 + (LINKS.length + 1) * 0.06, ease: EASE, duration: 0.5 }}
+                className="mt-4"
+              >
+                <Link
+                  href="/contact"
+                  className="inline-flex rounded-full bg-ink px-6 py-3 font-display text-lg font-semibold text-paper transition-colors hover:bg-accent"
+                >
+                  Réserver un appel
+                </Link>
+              </motion.div>
             </div>
           </motion.div>
         )}
