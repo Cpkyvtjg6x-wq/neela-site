@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { tagColor } from "@/lib/crm";
 
@@ -20,31 +20,39 @@ const SUGGESTED = [
   "Chaud",
 ];
 
+// Composant contrôlé : la liste des tags est pilotée par le parent (value/onChange),
+// pour pouvoir être conservée hors du composant (brouillon persistant).
 export default function TagInput({
+  value,
+  onChange,
   name = "tags",
-  defaultValue = [],
   placeholder = "Autre tag…",
 }: {
+  value: string[];
+  onChange: (tags: string[]) => void;
   name?: string;
-  defaultValue?: string[];
   placeholder?: string;
 }) {
-  const [tags, setTags] = useState<string[]>(defaultValue.filter(Boolean));
+  const tags = value;
   const [draft, setDraft] = useState("");
 
+  // Refs pour committer un tag à moitié tapé au démontage (ex : minimisation de la fiche).
+  const draftRef = useRef("");
+  draftRef.current = draft;
+  const tagsRef = useRef(value);
+  tagsRef.current = value;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
   function toggle(t: string) {
-    setTags((prev) =>
-      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
-    );
+    onChange(tags.includes(t) ? tags.filter((x) => x !== t) : [...tags, t]);
   }
   function add(raw: string) {
     const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
     if (!parts.length) return;
-    setTags((prev) => {
-      const next = [...prev];
-      for (const p of parts) if (!next.includes(p)) next.push(p);
-      return next;
-    });
+    const next = [...tags];
+    for (const p of parts) if (!next.includes(p)) next.push(p);
+    onChange(next);
     setDraft("");
   }
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -52,9 +60,21 @@ export default function TagInput({
       e.preventDefault();
       add(draft);
     } else if (e.key === "Backspace" && !draft && tags.length) {
-      setTags((prev) => prev.slice(0, -1));
+      onChange(tags.slice(0, -1));
     }
   }
+
+  useEffect(
+    () => () => {
+      const d = draftRef.current.trim();
+      if (!d) return;
+      const parts = d.split(",").map((s) => s.trim()).filter(Boolean);
+      const next = [...tagsRef.current];
+      for (const p of parts) if (!next.includes(p)) next.push(p);
+      if (next.length !== tagsRef.current.length) onChangeRef.current(next);
+    },
+    []
+  );
 
   const custom = tags.filter((t) => !SUGGESTED.includes(t));
 

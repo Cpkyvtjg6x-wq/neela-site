@@ -1,118 +1,56 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Mic, Square, Trash2 } from "lucide-react";
 import { OUTCOMES, INTERETS } from "@/lib/crm";
 import { addCall } from "@/app/crm/actions";
 import TagInput from "./TagInput";
+import { useRecorder, fmtElapsed } from "./RecordingProvider";
 
 export default function InteractionForm({
   prospectId,
+  prospectName,
   onSaved,
 }: {
   prospectId: string;
+  prospectName?: string | null;
   onSaved?: () => void;
 }) {
   const router = useRouter();
-  const formRef = useRef<HTMLFormElement>(null);
   const [pending, startTransition] = useTransition();
-  const [outcome, setOutcome] = useState("");
-  const [interet, setInteret] = useState("");
-  const [rappelType, setRappelType] = useState<"rappel" | "r1">("rappel");
-  const [tagKey, setTagKey] = useState(0);
   const [err, setErr] = useState<string | null>(null);
 
-  // ---- Audio ----
-  const recRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<BlobPart[]>([]);
-  const [recording, setRecording] = useState(false);
-  const [blob, setBlob] = useState<Blob | null>(null);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [recErr, setRecErr] = useState<string | null>(null);
-  const [canRecord, setCanRecord] = useState(false);
-  const [mime, setMime] = useState("");
+  // Enregistreur + brouillon globaux (survivent à la navigation et à la fermeture de la fiche).
+  const rec = useRecorder();
+  const d = rec.getDraft(prospectId);
+  const set = (patch: Parameters<typeof rec.patchDraft>[1]) => rec.patchDraft(prospectId, patch);
 
-  useEffect(() => {
-    const ok =
-      !!navigator.mediaDevices &&
-      typeof navigator.mediaDevices.getUserMedia === "function" &&
-      "MediaRecorder" in window;
-    setCanRecord(ok);
-    if (ok) {
-      const cands = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac"];
-      const MR = window.MediaRecorder as typeof MediaRecorder & {
-        isTypeSupported?: (t: string) => boolean;
-      };
-      const found = cands.find((c) => MR.isTypeSupported?.(c));
-      setMime(found || "");
-    }
-  }, []);
-
-  async function startRec() {
-    setRecErr(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
-      chunksRef.current = [];
-      mr.ondataavailable = (e) => {
-        if (e.data && e.data.size) chunksRef.current.push(e.data);
-      };
-      mr.onstop = () => {
-        const type = mr.mimeType || mime || "audio/webm";
-        const b = new Blob(chunksRef.current, { type });
-        setBlob(b);
-        setBlobUrl(URL.createObjectURL(b));
-        stream.getTracks().forEach((t) => t.stop());
-      };
-      mr.start();
-      recRef.current = mr;
-      setRecording(true);
-    } catch (e) {
-      const name = (e as Error)?.name;
-      setRecErr(
-        name === "NotAllowedError"
-          ? "Accès au micro refusé. Autorise le micro dans les réglages du navigateur, puis réessaie."
-          : "Micro indisponible sur cet appareil/navigateur."
-      );
-      setRecording(false);
-    }
-  }
-  function stopRec() {
-    try {
-      recRef.current?.stop();
-    } catch {
-      /* ignore */
-    }
-    setRecording(false);
-  }
-  function clearRec() {
-    setBlob(null);
-    if (blobUrl) URL.revokeObjectURL(blobUrl);
-    setBlobUrl(null);
-  }
+  const mine = rec.prospectId === prospectId; // l'enregistrement courant concerne CE prospect
+  const isRecording = rec.recording && mine;
+  const hasBlob = !!rec.blob && mine;
+  const otherActive = rec.active && !mine; // un enregistrement tourne pour un AUTRE prospect
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErr(null);
-    const fd = new FormData(e.currentTarget);
+    const fd = new FormData();
     fd.set("prospect_id", prospectId);
-    fd.set("outcome", outcome);
-    fd.set("interet", interet);
-    fd.set("rappel_type", rappelType);
-    if (blob) {
-      const ext = blob.type.includes("mp4") || blob.type.includes("m4a") ? "m4a" : "webm";
-      fd.append("audio", blob, `appel.${ext}`);
+    fd.set("outcome", d.outcome);
+    fd.set("interet", d.interet);
+    fd.set("notes", d.notes);
+    fd.set("tags", d.tags.join(","));
+    fd.set("rappel_at", d.rappelAt);
+    fd.set("rappel_type", d.rappelType);
+    if (rec.blob && rec.prospectId === prospectId) {
+      const ext = rec.blob.type.includes("mp4") || rec.blob.type.includes("m4a") ? "m4a" : "webm";
+      fd.append("audio", rec.blob, `appel.${ext}`);
     }
     startTransition(async () => {
       try {
         await addCall(fd);
-        formRef.current?.reset();
-        setOutcome("");
-        setInteret("");
-        setRappelType("rappel");
-        setTagKey((k) => k + 1);
-        clearRec();
+        rec.clearDraft(prospectId);
+        if (rec.prospectId === prospectId) rec.discard();
         router.refresh();
         onSaved?.();
       } catch {
@@ -128,19 +66,19 @@ export default function InteractionForm({
   const label = "text-xs font-semibold uppercase tracking-wide text-mut";
 
   return (
-    <form ref={formRef} onSubmit={onSubmit} className="rounded-2xl border border-line bg-white p-5">
+    <form onSubmit={onSubmit} className="rounded-2xl border border-line bg-white p-5">
       <h2 className="mb-4 font-display text-lg font-bold">Enregistrer un appel</h2>
 
       {/* Résultat en pastilles */}
       <p className={label}>Résultat</p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {OUTCOMES.map((o) => {
-          const on = outcome === o.key;
+          const on = d.outcome === o.key;
           return (
             <button
               type="button"
               key={o.key}
-              onClick={() => setOutcome(on ? "" : o.key)}
+              onClick={() => set({ outcome: on ? "" : o.key })}
               className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
                 on ? "bg-ink text-paper" : "border border-line text-mut hover:border-ink hover:text-ink"
               }`}
@@ -155,12 +93,12 @@ export default function InteractionForm({
       <p className={`${label} mt-4`}>Intérêt</p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {INTERETS.map((it) => {
-          const on = interet === it.key;
+          const on = d.interet === it.key;
           return (
             <button
               type="button"
               key={it.key}
-              onClick={() => setInteret(on ? "" : it.key)}
+              onClick={() => set({ interet: on ? "" : it.key })}
               className="rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors"
               style={
                 on
@@ -176,32 +114,43 @@ export default function InteractionForm({
 
       <div className="mt-4">
         <p className={label}>Tags</p>
-        <TagInput key={tagKey} name="tags" placeholder="ex : décideur absent…" />
+        <TagInput value={d.tags} onChange={(tags) => set({ tags })} placeholder="ex : décideur absent…" />
       </div>
 
       <div className="mt-3">
         <p className={label}>Commentaire</p>
-        <textarea name="notes" rows={3} className={field} placeholder="Ce qui s'est dit pendant l'appel…" />
+        <textarea
+          value={d.notes}
+          onChange={(e) => set({ notes: e.target.value })}
+          rows={3}
+          className={field}
+          placeholder="Ce qui s'est dit pendant l'appel…"
+        />
       </div>
 
       <div className="mt-3">
         <p className={label}>Rendez-vous / rappel</p>
-        <input type="datetime-local" name="rappel_at" className={field} />
+        <input
+          type="datetime-local"
+          value={d.rappelAt}
+          onChange={(e) => set({ rappelAt: e.target.value })}
+          className={field}
+        />
         <div className="mt-2 flex gap-2">
           <button
             type="button"
-            onClick={() => setRappelType("rappel")}
+            onClick={() => set({ rappelType: "rappel" })}
             className={`rounded-full px-3 py-1 text-xs font-semibold ${
-              rappelType === "rappel" ? "bg-amber-500 text-white" : "border border-line text-mut hover:border-ink"
+              d.rappelType === "rappel" ? "bg-amber-500 text-white" : "border border-line text-mut hover:border-ink"
             }`}
           >
             ● Rappel simple
           </button>
           <button
             type="button"
-            onClick={() => setRappelType("r1")}
+            onClick={() => set({ rappelType: "r1" })}
             className={`rounded-full px-3 py-1 text-xs font-semibold ${
-              rappelType === "r1" ? "bg-emerald-600 text-white" : "border border-line text-mut hover:border-ink"
+              d.rappelType === "r1" ? "bg-emerald-600 text-white" : "border border-line text-mut hover:border-ink"
             }`}
           >
             ● RDV (R1)
@@ -210,49 +159,56 @@ export default function InteractionForm({
         <p className="mt-1 text-[11px] text-mut">Le rappel apparaît dans l'agenda — orange (rappel) ou vert (R1).</p>
       </div>
 
-      {/* Enregistrement audio */}
+      {/* Enregistrement audio (global : continue même si tu changes de section) */}
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        {canRecord ? (
-          !recording ? (
-            <button
-              type="button"
-              onClick={startRec}
-              className="inline-flex items-center gap-2 rounded-full border border-line px-4 py-2 text-sm font-medium hover:border-ink"
-            >
-              <Mic size={16} /> {blob ? "Réenregistrer" : "Enregistrer l'appel"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={stopRec}
-              className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white"
-            >
-              <Square size={14} /> Arrêter
-            </button>
-          )
-        ) : (
+        {!rec.canRecord ? (
           <span className="text-xs text-mut">Micro non disponible sur ce navigateur.</span>
+        ) : otherActive ? (
+          <span className="text-xs font-medium text-amber-700">
+            Un enregistrement est déjà en cours pour « {rec.prospectName || "un autre prospect"} ». Termine-le avant d'en lancer un autre.
+          </span>
+        ) : !isRecording ? (
+          <button
+            type="button"
+            onClick={() => rec.start(prospectId, prospectName ?? null)}
+            className="inline-flex items-center gap-2 rounded-full border border-line px-4 py-2 text-sm font-medium hover:border-ink"
+          >
+            <Mic size={16} /> {hasBlob ? "Réenregistrer" : "Enregistrer l'appel"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => rec.stop()}
+            className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white"
+          >
+            <Square size={14} /> Arrêter
+          </button>
         )}
-        {recording && (
-          <span className="flex items-center gap-1.5 text-sm text-red-600">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-red-600" /> enregistrement…
+        {isRecording && (
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-red-600">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-red-600" /> {fmtElapsed(rec.elapsedMs)}
           </span>
         )}
-        {blobUrl && !recording && (
+        {hasBlob && !isRecording && rec.blobUrl && (
           <>
-            <audio controls src={blobUrl} className="h-9" />
-            <button type="button" onClick={clearRec} className="text-mut hover:text-red-600" aria-label="Supprimer">
+            <audio controls src={rec.blobUrl} className="h-9" />
+            <button
+              type="button"
+              onClick={() => rec.discard()}
+              className="text-mut hover:text-red-600"
+              aria-label="Supprimer l'enregistrement"
+            >
               <Trash2 size={16} />
             </button>
           </>
         )}
       </div>
-      {recErr && <p className="mt-2 text-sm font-medium text-red-600">{recErr}</p>}
+      {rec.error && mine && <p className="mt-2 text-sm font-medium text-red-600">{rec.error}</p>}
       {err && <p className="mt-2 text-sm font-medium text-red-600">{err}</p>}
 
       <button
         type="submit"
-        disabled={pending || recording}
+        disabled={pending || isRecording}
         className="mt-5 w-full rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
       >
         {pending ? "Enregistrement…" : "Enregistrer l'appel"}

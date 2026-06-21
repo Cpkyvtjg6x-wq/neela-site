@@ -11,8 +11,8 @@ import Tag from "./Tag";
 
 type Detail = { prospect: Prospect; calls: Call[]; audio: Record<string, string> };
 
-type Ctx = { open: (id: string) => void; close: () => void };
-const FicheCtx = createContext<Ctx>({ open: () => {}, close: () => {} });
+type Ctx = { open: (id: string) => void; close: () => void; openId: string | null };
+const FicheCtx = createContext<Ctx>({ open: () => {}, close: () => {}, openId: null });
 export const useFiche = () => useContext(FicheCtx);
 
 export function FicheProvider({ children }: { children: ReactNode }) {
@@ -20,7 +20,7 @@ export function FicheProvider({ children }: { children: ReactNode }) {
   const open = useCallback((i: string) => setId(i), []);
   const close = useCallback(() => setId(null), []);
   return (
-    <FicheCtx.Provider value={{ open, close }}>
+    <FicheCtx.Provider value={{ open, close, openId: id }}>
       {children}
       {id && <FicheModal id={id} onClose={close} />}
     </FicheCtx.Provider>
@@ -129,7 +129,7 @@ function FicheModal({ id, onClose }: { id: string; onClose: () => void }) {
             </div>
 
             {/* Bloc unique : enregistrer l'appel + rappel */}
-            <InteractionForm prospectId={p.id} onSaved={onClose} />
+            <InteractionForm prospectId={p.id} prospectName={p.nom} onSaved={onClose} />
 
             {/* Historique compact */}
             {data!.calls.length > 0 && (

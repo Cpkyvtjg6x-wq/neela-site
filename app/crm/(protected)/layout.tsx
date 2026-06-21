@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { isAuthed } from "@/lib/auth";
 import Sidebar from "@/components/crm/Sidebar";
 import { FicheProvider } from "@/components/crm/FicheModal";
+import { RecordingProvider } from "@/components/crm/RecordingProvider";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default function ProtectedLayout({
 
   return (
     <FicheProvider>
+      <RecordingProvider>
       <div className="min-h-screen bg-paper text-ink">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="md:grid md:grid-cols-[224px_1fr] md:gap-8">
@@ -32,6 +34,7 @@ export default function ProtectedLayout({
           </div>
         </div>
       </div>
+      </RecordingProvider>
     </FicheProvider>
   );
 }
