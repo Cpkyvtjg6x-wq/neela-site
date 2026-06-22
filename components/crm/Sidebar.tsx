@@ -8,6 +8,7 @@ import {
   CalendarDays,
   PhoneCall,
   Calculator,
+  FileText,
   Upload,
   LogOut,
 } from "lucide-react";
@@ -19,6 +20,7 @@ const NAV = [
   { href: "/crm/agenda", label: "Agenda", icon: CalendarDays, match: (p: string) => p.startsWith("/crm/agenda") },
   { href: "/crm/journal", label: "Journal", icon: PhoneCall, match: (p: string) => p.startsWith("/crm/journal") },
   { href: "/crm/ad-planner", label: "Ad Planner", icon: Calculator, match: (p: string) => p.startsWith("/crm/ad-planner") },
+  { href: "/crm/factures", label: "Factures", icon: FileText, match: (p: string) => p.startsWith("/crm/factures") },
   { href: "/crm/import", label: "Import", icon: Upload, match: (p: string) => p.startsWith("/crm/import") },
 ];
 

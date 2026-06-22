@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { AUTH_COOKIE, isAuthed } from "@/lib/auth";
 import { getDb } from "@/lib/supabaseAdmin";
 import { STATUTS, INTERETS } from "@/lib/crm";
+import { computeTotals, type InvoiceInput } from "@/lib/invoices";
 
 const STATUT_KEYS = new Set(STATUTS.map((s) => s.key));
 const INTERET_KEYS = new Set(INTERETS.map((s) => s.key));
@@ -363,4 +364,74 @@ export async function importCall(formData: FormData) {
 
   revalidateCrm(prospectId);
   return { ok: true };
+}
+
+// --- Factures ---
+export async function saveInvoice(
+  input: InvoiceInput
+): Promise<{ ok: boolean; id?: string; number?: string; error?: string }> {
+  assertAuth();
+  const db = getDb();
+  const t = computeTotals(input);
+
+  const base = {
+    status: input.status || "brouillon",
+    issue_date: input.issue_date,
+    due_date: input.due_date || null,
+    sale_date: input.sale_date || null,
+    prospect_id: input.prospect_id || null,
+    client: input.client,
+    emitter: input.emitter,
+    items: input.items,
+    vat_enabled: !!input.vat_enabled,
+    vat_rate: Number(input.vat_rate) || 20,
+    discount_type: input.discount_type,
+    discount_value: Number(input.discount_value) || 0,
+    deposit: Number(input.deposit) || 0,
+    notes: input.notes || null,
+    payment_terms: input.payment_terms || null,
+    total_ht: Math.round(t.ht * 100) / 100,
+    total_tva: Math.round(t.tva * 100) / 100,
+    total_ttc: Math.round(t.ttc * 100) / 100,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (input.id) {
+    const { error } = await db.from("neela_invoices").update(base).eq("id", input.id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/crm/factures");
+    return { ok: true, id: input.id };
+  }
+
+  // Numérotation séquentielle par année (ex. 2026-001).
+  const year = new Date((input.issue_date || new Date().toISOString().slice(0, 10)) + "T12:00:00Z").getUTCFullYear();
+  const { data: last } = await db
+    .from("neela_invoices").select("seq").eq("year", year).order("seq", { ascending: false }).limit(1);
+  const seq = ((last?.[0]?.seq as number) ?? 0) + 1;
+  const number = `${year}-${String(seq).padStart(3, "0")}`;
+
+  const { data, error } = await db
+    .from("neela_invoices")
+    .insert({ ...base, year, seq, number })
+    .select("id, number")
+    .single();
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/crm/factures");
+  return { ok: true, id: data?.id, number: data?.number };
+}
+
+export async function setInvoiceStatus(id: string, status: string) {
+  assertAuth();
+  const db = getDb();
+  const { error } = await db.from("neela_invoices").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/crm/factures");
+}
+
+export async function deleteInvoice(id: string) {
+  assertAuth();
+  const db = getDb();
+  const { error } = await db.from("neela_invoices").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/crm/factures");
 }
