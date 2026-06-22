@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { Plus, FileDown, Pencil, Trash2, Copy, ArrowRightCircle, User } from "lucide-react";
-import { invoiceHTML, eur2, STATUTS_FACTURE, type Invoice } from "@/lib/invoices";
+import { invoiceHTML, eur2, STATUTS_FACTURE, type Invoice, type InvoiceItem } from "@/lib/invoices";
 import { setInvoiceStatus, deleteInvoice, duplicateInvoiceNextMonth, convertDevisToInvoice } from "@/app/crm/actions";
 import InvoiceEditor from "./InvoiceEditor";
 
@@ -19,17 +19,17 @@ function openPrint(html: string) {
   w.document.close();
 }
 
+export type Prefill = { prospectId?: string; nom: string; email?: string | null; docType?: "facture" | "devis"; items?: InvoiceItem[] };
+
 export default function FacturesApp({
-  invoices, centres, openProspect,
+  invoices, centres, prefill: initialPrefill,
 }: {
   invoices: Invoice[];
   centres: Centre[];
-  openProspect?: { id: string; nom: string; email: string | null };
+  prefill?: Prefill;
 }) {
-  const [prefill, setPrefill] = useState(
-    openProspect ? { prospectId: openProspect.id, nom: openProspect.nom, email: openProspect.email } : undefined
-  );
-  const [editing, setEditing] = useState<Invoice | "new" | null>(openProspect ? "new" : null);
+  const [prefill, setPrefill] = useState(initialPrefill);
+  const [editing, setEditing] = useState<Invoice | "new" | null>(initialPrefill ? "new" : null);
   const [filter, setFilter] = useState<"tout" | "facture" | "devis">("tout");
   const [pending, start] = useTransition();
 

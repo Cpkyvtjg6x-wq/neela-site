@@ -22,10 +22,10 @@ export default async function StatsPage() {
 
   // Entonnoir
   const funnel = [
-    { label: "Prospects", value: total, color: "#0a0a0a" },
-    { label: "Contactés", value: contacted, color: "#2563eb" },
-    { label: "RDV obtenus", value: rdv, color: "#7c3aed" },
-    { label: "Signés", value: signes, color: "#059669" },
+    { label: "Prospects", value: total, color: "#0a0a0a", href: "/crm/prospects" },
+    { label: "Contactés", value: contacted, color: "#2563eb", href: "/crm/journal" },
+    { label: "RDV obtenus", value: rdv, color: "#7c3aed", href: "/crm/agenda" },
+    { label: "Signés", value: signes, color: "#059669", href: "/crm/pipeline" },
   ];
 
   // Appels par jour (30 derniers jours, Europe/Paris)
@@ -106,9 +106,9 @@ export default async function StatsPage() {
               const prev = i === 0 ? f.value : funnel[i - 1].value;
               const widthPct = total > 0 ? Math.max(4, (f.value / total) * 100) : 4;
               return (
-                <div key={f.label}>
+                <Link key={f.label} href={f.href} className="block rounded-lg transition-opacity hover:opacity-90">
                   <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-medium">{f.label}</span>
+                    <span className="font-medium hover:text-accent">{f.label} →</span>
                     <span className="text-mut">
                       <b className="text-ink">{f.value}</b>
                       {i > 0 && <span className="ml-2 text-[12px]">({pct(f.value, prev)}% de l'étape préc.)</span>}
@@ -119,7 +119,7 @@ export default async function StatsPage() {
                       {total > 0 ? `${pct(f.value, total)}%` : ""}
                     </div>
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>

@@ -10,6 +10,7 @@ export default function ImportPage() {
   const [progress, setProgress] = useState({ done: 0, total: 0, audios: 0, errors: 0 });
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [lastId, setLastId] = useState<string | null>(null);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -58,6 +59,7 @@ export default function ImportPage() {
       try {
         const r: any = await importCall(fd);
         if (!r?.ok) errors++;
+        else if (r.id) setLastId(r.id);
       } catch {
         errors++;
       }
@@ -118,6 +120,14 @@ export default function ImportPage() {
           >
             Voir le journal d'appels →
           </Link>
+          {lastId && (
+            <Link
+              href={`/crm/prospect/${lastId}`}
+              className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold hover:border-ink"
+            >
+              Ouvrir la dernière fiche →
+            </Link>
+          )}
           <Link
             href="/crm"
             className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold hover:border-ink"

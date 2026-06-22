@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, type ReactNode } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Target, Wallet, ShieldCheck, Gauge, Rocket, AlertTriangle, CheckCircle2, MapPin, FileDown, TrendingUp, Sliders, Layers, Search, Sparkles } from "lucide-react";
+import { Target, Wallet, ShieldCheck, Gauge, Rocket, AlertTriangle, CheckCircle2, MapPin, FileDown, TrendingUp, Sliders, Layers, Search, Sparkles, FileText } from "lucide-react";
 
 type Commune = { nom: string; codeDepartement: string; departement?: { nom: string; code: string }; population: number };
 
@@ -752,6 +753,12 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
                 <FileDown size={16} /> Exporter
               </button>
             </div>
+            <Link
+              href={`/crm/factures?new=1&type=devis&client=${encodeURIComponent(centreName)}&budget=${Math.round(r.budgetPub)}&fee=${fee}`}
+              className="mt-3 inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20"
+            >
+              <FileText size={16} /> Créer un devis depuis ces chiffres
+            </Link>
           </div>
 
           <p className="text-xs text-mut">

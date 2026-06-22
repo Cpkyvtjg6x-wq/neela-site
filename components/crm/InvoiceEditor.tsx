@@ -30,7 +30,7 @@ export default function InvoiceEditor({
   initial: Invoice | null;
   centres: Centre[];
   onClose: () => void;
-  prefill?: { prospectId: string; nom: string; email?: string | null };
+  prefill?: { prospectId?: string; nom: string; email?: string | null; docType?: "facture" | "devis"; items?: InvoiceItem[] };
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -45,10 +45,10 @@ export default function InvoiceEditor({
   const [dueDate, setDueDate] = useState(initial?.due_date ?? addDaysISO(todayISO(), 30));
   const [saleDate, setSaleDate] = useState(initial?.sale_date ?? "");
   const [status, setStatus] = useState(initial?.status ?? "brouillon");
-  const [docType, setDocType] = useState<"facture" | "devis">(initial?.doc_type ?? "facture");
+  const [docType, setDocType] = useState<"facture" | "devis">(initial?.doc_type ?? prefill?.docType ?? "facture");
   const [validUntil, setValidUntil] = useState(initial?.valid_until ?? addDaysISO(todayISO(), 30));
   const [items, setItems] = useState<InvoiceItem[]>(
-    initial?.items?.length ? initial.items : [{ designation: "Gestion campagnes Meta Ads", qty: 1, unit: 0 }]
+    initial?.items?.length ? initial.items : (prefill?.items?.length ? prefill.items : [{ designation: "Gestion campagnes Meta Ads", qty: 1, unit: 0 }])
   );
   const [vatEnabled, setVatEnabled] = useState(initial?.vat_enabled ?? false);
   const [vatRate, setVatRate] = useState(initial?.vat_rate ?? 20);

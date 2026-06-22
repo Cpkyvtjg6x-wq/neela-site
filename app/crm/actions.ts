@@ -456,7 +456,7 @@ export async function importCall(formData: FormData) {
     .eq("prospect_id", prospectId)
     .eq("created_at", created_at)
     .limit(1);
-  if (dup && dup.length) return { ok: true, dup: true };
+  if (dup && dup.length) return { ok: true, dup: true, id: prospectId };
 
   let recording_path: string | null = null;
   const audio = formData.get("audio");
@@ -480,7 +480,7 @@ export async function importCall(formData: FormData) {
   });
 
   revalidateCrm(prospectId);
-  return { ok: true };
+  return { ok: true, id: prospectId };
 }
 
 // --- Factures ---

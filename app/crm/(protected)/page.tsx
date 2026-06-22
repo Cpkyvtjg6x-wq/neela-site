@@ -3,6 +3,7 @@ import { Flame, PhoneOutgoing, CalendarClock, Users, Plus, Check, PhoneCall, Ale
 import { getAllProspects, getAllCalls, getAppointments, indexProspects } from "@/lib/crmData";
 import { STATUTS, statutLabel, regionForDept } from "@/lib/crm";
 import { clearRappel } from "@/app/crm/actions";
+import OpenFicheLink from "@/components/crm/OpenFicheLink";
 
 export const dynamic = "force-dynamic";
 
@@ -145,12 +146,13 @@ export default async function Dashboard() {
                     <span
                       className={`h-2 w-2 shrink-0 rounded-full ${overdue ? "bg-red-500" : "bg-amber-500"}`}
                     />
-                    <Link
-                      href={p ? `/crm/prospect/${p.id}` : "/crm"}
-                      className="min-w-0 flex-1 truncate text-sm font-medium hover:text-accent"
-                    >
-                      {p?.nom ?? "Prospect"}
-                    </Link>
+                    {p ? (
+                      <OpenFicheLink prospect={p} className="min-w-0 flex-1 truncate text-left text-sm font-medium hover:text-accent">
+                        {p.nom ?? "Prospect"}
+                      </OpenFicheLink>
+                    ) : (
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">Prospect</span>
+                    )}
                     {overdue && (
                       <span className="shrink-0 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-600">
                         en retard
@@ -199,9 +201,13 @@ export default async function Dashboard() {
                       <p className="text-xs font-bold text-accent">{fmtDate(a.start_at)}</p>
                       <p className="text-xs text-mut">{fmtTime(a.start_at)}</p>
                     </div>
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                      {a.name || p?.nom || "Rendez-vous"}
-                    </span>
+                    {p ? (
+                      <OpenFicheLink prospect={p} className="min-w-0 flex-1 truncate text-left text-sm font-medium hover:text-accent">
+                        {a.name || p.nom || "Rendez-vous"}
+                      </OpenFicheLink>
+                    ) : (
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{a.name || "Rendez-vous"}</span>
+                    )}
                   </li>
                 );
               })}
