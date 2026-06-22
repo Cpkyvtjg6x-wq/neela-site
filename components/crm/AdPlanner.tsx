@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, type ReactNode } from "react";
-import { Target, Wallet, ShieldCheck, Gauge, Rocket, AlertTriangle, CheckCircle2, MapPin, FileDown, TrendingUp, Sliders, Layers, Search } from "lucide-react";
+import { Target, Wallet, ShieldCheck, Gauge, Rocket, AlertTriangle, CheckCircle2, MapPin, FileDown, TrendingUp, Sliders, Layers, Search, Sparkles } from "lucide-react";
 
 type Commune = { nom: string; codeDepartement: string; departement?: { nom: string; code: string }; population: number };
 
@@ -25,6 +25,7 @@ type Vocab = {
   margeUnit: string; audienceLabel: string;
   partPremium: number; margePremium: number; margeBase: number;
   share: number; density: number; adKeyword: string;
+  adCpl: number; adLeadToRdv: number; adPresence: number; adClosing: number;
 };
 const METIERS: Record<Metier, Vocab> = {
   audio: {
@@ -35,6 +36,7 @@ const METIERS: Record<Metier, Vocab> = {
     audienceLabel: "Population 55 ans et + ciblable",
     partPremium: 50, margePremium: 1500, margeBase: 300,
     share: 0.31, density: 16000, adKeyword: "audioprothésiste",
+    adCpl: 14, adLeadToRdv: 35, adPresence: 70, adClosing: 25,
   },
   optique: {
     label: "Opticien", objectif: "RDV / visites visés / mois",
@@ -44,6 +46,7 @@ const METIERS: Record<Metier, Vocab> = {
     audienceLabel: "Population ciblable (zone)",
     partPremium: 40, margePremium: 280, margeBase: 90,
     share: 0.55, density: 6000, adKeyword: "opticien",
+    adCpl: 9, adLeadToRdv: 40, adPresence: 75, adClosing: 30,
   },
   dentaire: {
     label: "Cabinet dentaire", objectif: "Nouveaux patients visés / mois",
@@ -53,6 +56,7 @@ const METIERS: Record<Metier, Vocab> = {
     audienceLabel: "Population ciblable (zone)",
     partPremium: 30, margePremium: 1200, margeBase: 150,
     share: 0.50, density: 1700, adKeyword: "dentiste",
+    adCpl: 12, adLeadToRdv: 30, adPresence: 72, adClosing: 28,
   },
 };
 
@@ -143,6 +147,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   const [citySug, setCitySug] = useState<Commune[]>([]);
   const [city, setCity] = useState<Commune | null>(null);
   const [compLevel, setCompLevel] = useState<"faible" | "moyenne" | "forte">("moyenne");
+  const [autoActive, setAutoActive] = useState(false);
 
   const V = METIERS[metier];
 
@@ -150,13 +155,14 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
     const v = METIERS[m];
     setMetier(m);
     setPartC2(v.partPremium); setMargeC2(v.margePremium); setMargeC1(v.margeBase);
+    setAutoActive(false);
   };
   const applyScenario = (k: ScenKey) => {
     const s = SCENARIOS[k];
     setCpl(s.cpl); setLeadToRdv(s.leadToRdv); setPresence(s.presence); setClosing(s.closing);
-    setScenario(k);
+    setScenario(k); setAutoActive(false);
   };
-  const A = (setter: (n: number) => void) => (n: number) => { setter(n); setScenario(null); };
+  const A = (setter: (n: number) => void) => (n: number) => { setter(n); setScenario(null); setAutoActive(false); };
 
   const blendedMarge = (partC2 / 100) * margeC2 + (1 - partC2 / 100) * margeC1;
   const ceiling = pop55 * 0.005;
@@ -192,6 +198,33 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
 
   const ctx: Ctx = { mode, targetRdv, budget, marge: blendedMarge, fee, ceiling, period, compMult };
   const cur: Assum = { cpl, leadToRdv, presence, closing };
+
+  // Mode auto : règle hypothèses pub + économie + concurrence au plus réaliste
+  // selon le métier et la densité de la zone (ville sélectionnée).
+  function autoOptimize() {
+    const v = METIERS[metier];
+    let cplAdj = 1;
+    let level: "faible" | "moyenne" | "forte" = "moyenne";
+    if (city) {
+      if (scopedPop > 150000) { cplAdj = 1.2; level = "forte"; }
+      else if (scopedPop > 40000) { cplAdj = 1; level = "moyenne"; }
+      else { cplAdj = 0.85; level = "faible"; }
+    }
+    const newCpl = Math.round(v.adCpl * cplAdj);
+    const newPop = city && estPop ? Math.min(200000, Math.max(1500, Math.round(estPop / 1000) * 1000)) : pop55;
+    const compM = level === "faible" ? 0.9 : level === "forte" ? 1.25 : 1;
+    const newMarge = (v.partPremium / 100) * v.margePremium + (1 - v.partPremium / 100) * v.margeBase;
+    const tmp = compute(
+      { cpl: newCpl, leadToRdv: v.adLeadToRdv, presence: v.adPresence, closing: v.adClosing },
+      { ...ctx, marge: newMarge, ceiling: newPop * 0.005, compMult: compM }
+    );
+    const newFee = Math.round(Math.min(2500, Math.max(600, 0.25 * tmp.margeGen)) / 10) * 10;
+
+    setCpl(newCpl); setLeadToRdv(v.adLeadToRdv); setPresence(v.adPresence); setClosing(v.adClosing);
+    setPartC2(v.partPremium); setMargeC2(v.margePremium); setMargeC1(v.margeBase);
+    setPop55(newPop); setCompLevel(level); setFee(newFee);
+    setScenario(null); setAutoActive(true);
+  }
 
   const r = compute(cur, ctx);
   const rP = compute(SCENARIOS.prudent, ctx);
@@ -396,9 +429,16 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-ink">Scénario d'hypothèses</p>
-            <p className="text-xs text-mut">{scenario ? `Réglage « ${SCENARIOS[scenario].label} »` : "Réglage personnalisé"} — montre le bas de la fourchette au client, jamais le haut.</p>
+            <p className="text-xs text-mut">
+              {autoActive ? "Réglage automatique optimisé (zone + métier)" : scenario ? `Réglage « ${SCENARIOS[scenario].label} »` : "Réglage personnalisé"} — montre le bas de la fourchette au client, jamais le haut.
+            </p>
           </div>
-          <div className="inline-flex gap-2">
+          <div className="inline-flex flex-wrap items-center gap-2">
+            <button onClick={autoOptimize} title="Régler automatiquement selon le métier et la zone sélectionnée"
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${autoActive ? "border-accent bg-accent text-white" : "border-accent text-accent hover:bg-accent hover:text-white"}`}>
+              <Sparkles size={14} /> Auto
+            </button>
+            <span className="mx-0.5 hidden h-4 w-px bg-line sm:block" />
             {(Object.keys(SCENARIOS) as ScenKey[]).map((k) => (
               <button key={k} onClick={() => applyScenario(k)}
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${scenario === k ? "border-accent bg-accent text-white" : "border-line text-mut hover:border-accent"}`}>
