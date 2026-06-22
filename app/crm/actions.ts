@@ -375,6 +375,8 @@ export async function saveInvoice(
   const t = computeTotals(input);
 
   const base = {
+    doc_type: input.doc_type === "devis" ? "devis" : "facture",
+    valid_until: input.valid_until || null,
     status: input.status || "brouillon",
     issue_date: input.issue_date,
     due_date: input.due_date || null,
@@ -403,12 +405,13 @@ export async function saveInvoice(
     return { ok: true, id: input.id };
   }
 
-  // Numérotation séquentielle par année (ex. 2026-001).
+  // Numérotation séquentielle par année ET type (devis : D2026-001, facture : 2026-001).
+  const docType = base.doc_type;
   const year = new Date((input.issue_date || new Date().toISOString().slice(0, 10)) + "T12:00:00Z").getUTCFullYear();
   const { data: last } = await db
-    .from("neela_invoices").select("seq").eq("year", year).order("seq", { ascending: false }).limit(1);
+    .from("neela_invoices").select("seq").eq("year", year).eq("doc_type", docType).order("seq", { ascending: false }).limit(1);
   const seq = ((last?.[0]?.seq as number) ?? 0) + 1;
-  const number = `${year}-${String(seq).padStart(3, "0")}`;
+  const number = `${docType === "devis" ? "D" : ""}${year}-${String(seq).padStart(3, "0")}`;
 
   const { data, error } = await db
     .from("neela_invoices")
@@ -418,6 +421,53 @@ export async function saveInvoice(
   if (error) return { ok: false, error: error.message };
   revalidatePath("/crm/factures");
   return { ok: true, id: data?.id, number: data?.number };
+}
+
+// Duplique une facture/un devis (ex. pour le mois suivant) ou convertit un devis en facture.
+function shiftISO(iso: string, months: number, days: number): string {
+  const d = new Date((iso || new Date().toISOString().slice(0, 10)) + "T12:00:00Z");
+  d.setUTCMonth(d.getUTCMonth() + months);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+async function copyInvoice(id: string, opts: { toInvoice?: boolean; nextMonth?: boolean }) {
+  assertAuth();
+  const db = getDb();
+  const { data: src } = await db.from("neela_invoices").select("*").eq("id", id).single();
+  if (!src) return { ok: false, error: "Introuvable" };
+
+  const toFacture = opts.toInvoice && src.doc_type === "devis";
+  const m = opts.nextMonth ? 1 : 0;
+  const today = new Date().toISOString().slice(0, 10);
+
+  const input: InvoiceInput = {
+    doc_type: toFacture ? "facture" : (src.doc_type as "facture" | "devis"),
+    valid_until: src.valid_until ? shiftISO(src.valid_until, m, 0) : null,
+    status: "brouillon",
+    issue_date: opts.nextMonth ? shiftISO(src.issue_date, 1, 0) : today,
+    due_date: toFacture ? shiftISO(today, 0, 30) : (src.due_date ? shiftISO(src.due_date, m, 0) : null),
+    sale_date: null,
+    prospect_id: src.prospect_id ?? null,
+    client: src.client,
+    emitter: src.emitter,
+    items: src.items,
+    vat_enabled: src.vat_enabled,
+    vat_rate: src.vat_rate,
+    discount_type: src.discount_type,
+    discount_value: src.discount_value,
+    deposit: 0,
+    notes: src.notes,
+    payment_terms: src.payment_terms,
+  };
+  return saveInvoice(input);
+}
+
+export async function duplicateInvoiceNextMonth(id: string) {
+  return copyInvoice(id, { nextMonth: true });
+}
+export async function convertDevisToInvoice(id: string) {
+  return copyInvoice(id, { toInvoice: true });
 }
 
 export async function setInvoiceStatus(id: string, status: string) {

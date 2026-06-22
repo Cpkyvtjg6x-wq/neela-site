@@ -1,11 +1,13 @@
-// Types & helpers du générateur de factures (régime franchise en base par défaut).
+// Types & helpers du générateur de factures / devis (régime franchise en base par défaut).
 
 export type InvoiceItem = { designation: string; qty: number; unit: number }; // unit = PU HT
 export type InvoiceClient = { nom: string; adresse: string; email: string; siret: string };
 export type InvoiceEmitter = {
   nom: string; adresse: string; siret: string; tvaIntra: string;
-  email: string; tel: string; iban: string; bic: string;
+  email: string; tel: string; iban: string; bic: string; logo?: string;
 };
+
+export type DocType = "facture" | "devis";
 
 export type Invoice = {
   id: string;
@@ -14,6 +16,8 @@ export type Invoice = {
   year: number;
   seq: number;
   number: string;
+  doc_type: DocType;
+  valid_until: string | null;
   status: string;
   issue_date: string;
   due_date: string | null;
@@ -34,7 +38,6 @@ export type Invoice = {
   total_ttc: number;
 };
 
-// Données envoyées au serveur pour créer / mettre à jour une facture.
 export type InvoiceInput = Omit<Invoice, "id" | "created_at" | "updated_at" | "year" | "seq" | "number" | "total_ht" | "total_tva" | "total_ttc"> & {
   id?: string;
 };
@@ -78,10 +81,52 @@ const dfr = (d: string | null) =>
 const esc = (s: string) =>
   String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-// HTML d'une facture, prêt à imprimer / exporter en PDF (charte Neela).
+// --- Montant en toutes lettres (français) ---
+const U = ["zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize", "dix-sept", "dix-huit", "dix-neuf"];
+const TENS = ["", "", "vingt", "trente", "quarante", "cinquante", "soixante", "", "quatre-vingt", ""];
+function below100(n: number): string {
+  if (n < 20) return U[n];
+  const t = Math.floor(n / 10), u = n % 10;
+  if (t === 7) return u === 1 ? "soixante et onze" : "soixante-" + U[10 + u];
+  if (t === 9) return "quatre-vingt-" + U[10 + u];
+  let w = TENS[t];
+  if (t === 8 && u === 0) return "quatre-vingts";
+  if (u === 0) return w;
+  if (u === 1 && t !== 8) return w + " et un";
+  return w + "-" + U[u];
+}
+function below1000(n: number): string {
+  const c = Math.floor(n / 100), r = n % 100;
+  if (c === 0) return below100(r);
+  let s = c === 1 ? "cent" : U[c] + " cent";
+  if (r === 0 && c > 1) s += "s";
+  if (r > 0) s += " " + below100(r);
+  return s;
+}
+function toWords(n: number): string {
+  if (n === 0) return "zéro";
+  const mil = Math.floor(n / 1000000), th = Math.floor((n % 1000000) / 1000), r = n % 1000;
+  const parts: string[] = [];
+  if (mil > 0) parts.push(mil === 1 ? "un million" : below1000(mil) + " millions");
+  if (th > 0) parts.push(th === 1 ? "mille" : below1000(th) + " mille");
+  if (r > 0) parts.push(below1000(r));
+  return parts.join(" ");
+}
+export function montantEnLettres(amount: number): string {
+  const a = Math.round((Number(amount) || 0) * 100) / 100;
+  const euros = Math.floor(a), cents = Math.round((a - euros) * 100);
+  let s = `${toWords(euros)} euro${euros > 1 ? "s" : ""}`;
+  if (cents > 0) s += ` et ${toWords(cents)} centime${cents > 1 ? "s" : ""}`;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// HTML d'une facture/devis, prêt à imprimer / exporter en PDF (charte Neela).
 export function invoiceHTML(inv: Invoice): string {
   const t = computeTotals(inv);
   const e = inv.emitter, c = inv.client;
+  const isDevis = inv.doc_type === "devis";
+  const title = isDevis ? "Devis" : "Facture";
+
   const rows = inv.items
     .filter((i) => i.designation || i.unit || i.qty)
     .map((i) => {
@@ -95,15 +140,41 @@ export function invoiceHTML(inv: Invoice): string {
        <tr><td>TVA ${inv.vat_rate} %</td><td class="r">${eur2(t.tva)}</td></tr>
        <tr class="tot"><td>Total TTC</td><td class="r">${eur2(t.ttc)}</td></tr>`
     : `<tr class="tot"><td>Total</td><td class="r">${eur2(t.ttc)}</td></tr>`;
-
-  const depositLine = inv.deposit > 0 ? `<tr><td>Acompte déjà versé</td><td class="r">− ${eur2(inv.deposit)}</td></tr><tr class="tot"><td>Net à payer</td><td class="r">${eur2(t.net)}</td></tr>` : "";
+  const depositLine = !isDevis && inv.deposit > 0 ? `<tr><td>Acompte déjà versé</td><td class="r">− ${eur2(inv.deposit)}</td></tr><tr class="tot"><td>Net à payer</td><td class="r">${eur2(t.net)}</td></tr>` : "";
   const discLine = t.disc > 0 ? `<tr><td>Remise</td><td class="r">− ${eur2(t.disc)}</td></tr>` : "";
   const vatMention = inv.vat_enabled ? "" : `<p class="mention">TVA non applicable, art. 293 B du CGI.</p>`;
 
-  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Facture ${esc(inv.number)}</title>
+  const amountWords = !isDevis && inv.deposit > 0 ? t.net : t.ttc;
+  const lettres = `<p class="lettres">Arrêté${isDevis ? "" : "e"} à la somme de ${esc(montantEnLettres(amountWords))}.</p>`;
+
+  const stampMap: Record<string, [string, string]> = {
+    brouillon: ["BROUILLON", "#94a3b8"], payee: ["PAYÉE", "#059669"], annulee: ["ANNULÉE", "#dc2626"],
+  };
+  const sm = stampMap[inv.status];
+  const stamp = sm ? `<div class="stamp" style="color:${sm[1]};border-color:${sm[1]}">${sm[0]}</div>` : "";
+
+  const logoHtml = e.logo
+    ? `<img src="${esc(e.logo)}" alt="${esc(e.nom || "Neela")}" style="height:44px;max-width:220px;object-fit:contain"/>`
+    : `<div class="brand"><span class="dot"></span> ${esc(e.nom || "Neela")}</div>`;
+
+  const meta = isDevis
+    ? `N° <b>${esc(inv.number)}</b><br>Émis le ${dfr(inv.issue_date)}${inv.valid_until ? `<br>Valable jusqu'au ${dfr(inv.valid_until)}` : ""}`
+    : `N° <b>${esc(inv.number)}</b><br>Émise le ${dfr(inv.issue_date)}<br>Échéance : ${dfr(inv.due_date)}${inv.sale_date ? `<br>Prestation : ${dfr(inv.sale_date)}` : ""}`;
+
+  const bottom = isDevis
+    ? `<div class="sign"><div class="siglab">Bon pour accord — date et signature du client :</div><div class="sigbox"></div></div>`
+    : (e.iban ? `<div class="pay">Règlement par virement — <b>IBAN</b> ${esc(e.iban)}${e.bic ? ` · <b>BIC</b> ${esc(e.bic)}` : ""}</div>` : "");
+
+  const foot = isDevis
+    ? `Devis valable ${inv.valid_until ? `jusqu'au ${dfr(inv.valid_until)}` : "30 jours"}. Une fois accepté, il fera l'objet d'une facture.${inv.notes ? `<br><br>${esc(inv.notes)}` : ""}`
+    : `${esc(inv.payment_terms || DEFAULT_TERMS)}${inv.notes ? `<br><br>${esc(inv.notes)}` : ""}`;
+
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${title} ${esc(inv.number)}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0A0A0A;padding:46px;max-width:820px;margin:auto;font-size:13px;line-height:1.5}
+  body{position:relative;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0A0A0A;padding:46px;max-width:820px;margin:auto;font-size:13px;line-height:1.5}
+  .bar{position:fixed;top:0;left:0;right:0;height:6px;background:#2563EB}
+  .stamp{position:absolute;top:54px;right:46px;transform:rotate(-11deg);border:3px solid;border-radius:8px;padding:3px 14px;font-weight:800;font-size:20px;letter-spacing:2px;opacity:.85}
   .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:34px}
   .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:22px;letter-spacing:-.02em}
   .dot{width:11px;height:11px;border-radius:50%;background:#2563EB;display:inline-block}
@@ -122,20 +193,26 @@ export function invoiceHTML(inv: Invoice): string {
   .totals{margin-top:18px;margin-left:auto;width:300px}
   .totals td{padding:7px 10px;border-bottom:1px solid rgba(10,10,10,.08)}
   .totals .tot td{border-bottom:none;border-top:2px solid #0A0A0A;font-weight:800;font-size:15px}
+  .lettres{margin-top:8px;text-align:right;font-size:11.5px;color:#444;font-style:italic}
   .pay{margin-top:26px;background:#F4F7FE;border:1px solid #DCE6FB;border-radius:12px;padding:14px;font-size:12px}
   .pay b{color:#1E3A8A}
+  .sign{margin-top:30px}
+  .sign .siglab{font-size:11px;color:#6B7280;margin-bottom:6px}
+  .sign .sigbox{width:280px;height:92px;border:1px dashed rgba(10,10,10,.28);border-radius:10px}
   .mention{margin-top:14px;font-size:12px;color:#444;font-style:italic}
   .foot{margin-top:28px;border-top:1px solid rgba(10,10,10,.1);padding-top:12px;font-size:10.5px;color:#888;line-height:1.6}
   @media print{body{padding:24px}}
 </style></head><body>
+  <div class="bar"></div>
+  ${stamp}
   <div class="top">
     <div>
-      <div class="brand"><span class="dot"></span> ${esc(e.nom || "Neela")}</div>
+      ${logoHtml}
       <div class="em">${esc(e.adresse || "")}${e.siret ? `<br>SIRET : ${esc(e.siret)}` : ""}${e.tvaIntra && inv.vat_enabled ? `<br>TVA : ${esc(e.tvaIntra)}` : ""}${e.email ? `<br>${esc(e.email)}` : ""}${e.tel ? ` · ${esc(e.tel)}` : ""}</div>
     </div>
     <div class="doc">
-      <h1>Facture</h1>
-      <div class="meta">N° <b>${esc(inv.number)}</b><br>Émise le ${dfr(inv.issue_date)}<br>Échéance : ${dfr(inv.due_date)}${inv.sale_date ? `<br>Prestation : ${dfr(inv.sale_date)}` : ""}</div>
+      <h1>${title}</h1>
+      <div class="meta">${meta}</div>
     </div>
   </div>
 
@@ -150,12 +227,11 @@ export function invoiceHTML(inv: Invoice): string {
   </table>
 
   <table class="totals">${discLine}${tvaLines}${depositLine}</table>
-
+  ${lettres}
   ${vatMention}
+  ${bottom}
 
-  ${e.iban ? `<div class="pay">Règlement par virement — <b>IBAN</b> ${esc(e.iban)}${e.bic ? ` · <b>BIC</b> ${esc(e.bic)}` : ""}</div>` : ""}
-
-  <div class="foot">${esc(inv.payment_terms || DEFAULT_TERMS)}${inv.notes ? `<br><br>${esc(inv.notes)}` : ""}</div>
+  <div class="foot">${foot}</div>
   <script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script>
 </body></html>`;
 }

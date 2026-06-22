@@ -41,6 +41,8 @@ export default function InvoiceEditor({
   const [dueDate, setDueDate] = useState(initial?.due_date ?? addDaysISO(todayISO(), 30));
   const [saleDate, setSaleDate] = useState(initial?.sale_date ?? "");
   const [status, setStatus] = useState(initial?.status ?? "brouillon");
+  const [docType, setDocType] = useState<"facture" | "devis">(initial?.doc_type ?? "facture");
+  const [validUntil, setValidUntil] = useState(initial?.valid_until ?? addDaysISO(todayISO(), 30));
   const [items, setItems] = useState<InvoiceItem[]>(
     initial?.items?.length ? initial.items : [{ designation: "Gestion campagnes Meta Ads", qty: 1, unit: 0 }]
   );
@@ -68,6 +70,7 @@ export default function InvoiceEditor({
 
   const payload = () => ({
     id: initial?.id,
+    doc_type: docType, valid_until: docType === "devis" ? (validUntil || null) : null,
     status, issue_date: issueDate, due_date: dueDate || null, sale_date: saleDate || null,
     prospect_id: prospectId, client, emitter, items,
     vat_enabled: vatEnabled, vat_rate: vatRate,
@@ -78,6 +81,7 @@ export default function InvoiceEditor({
   function buildInvoice(number: string, id: string): Invoice {
     return {
       id, created_at: "", updated_at: "", year: 0, seq: 0, number,
+      doc_type: docType, valid_until: docType === "devis" ? (validUntil || null) : null,
       status, issue_date: issueDate, due_date: dueDate || null, sale_date: saleDate || null,
       prospect_id: prospectId, client, emitter, items,
       vat_enabled: vatEnabled, vat_rate: vatRate,
@@ -130,7 +134,9 @@ export default function InvoiceEditor({
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-bold tracking-tight">{initial ? `Facture ${initial.number}` : "Nouvelle facture"}</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight">
+            {initial ? `${initial.doc_type === "devis" ? "Devis" : "Facture"} ${initial.number}` : (docType === "devis" ? "Nouveau devis" : "Nouvelle facture")}
+          </h1>
           <p className="mt-1 text-sm text-mut">{initial ? "Modification" : "Le numéro est attribué automatiquement à l'enregistrement."}</p>
         </div>
         <button onClick={onClose} className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-sm font-semibold text-mut hover:border-ink hover:text-ink">
@@ -151,6 +157,7 @@ export default function InvoiceEditor({
             <div><p className={label}>Téléphone</p><input value={emitter.tel} onChange={(e) => setEmitter({ ...emitter, tel: e.target.value })} className={field} /></div>
             <div><p className={label}>IBAN</p><input value={emitter.iban} onChange={(e) => setEmitter({ ...emitter, iban: e.target.value })} className={field} /></div>
             <div><p className={label}>BIC</p><input value={emitter.bic} onChange={(e) => setEmitter({ ...emitter, bic: e.target.value })} className={field} /></div>
+            <div className="sm:col-span-2"><p className={label}>Logo (URL ou chemin, ex. /logo-neela.png)</p><input value={emitter.logo ?? ""} onChange={(e) => setEmitter({ ...emitter, logo: e.target.value })} placeholder="Laisse vide pour la pastille ● Neela" className={field} /></div>
           </div>
           <p className="mt-2 text-[11px] text-mut">Tes coordonnées sont mémorisées dans ce navigateur pour les prochaines factures.</p>
         </details>
@@ -183,11 +190,23 @@ export default function InvoiceEditor({
 
         {/* Dates & statut */}
         <div className={card}>
-          <h2 className="mb-4 font-display text-base font-bold">Dates & statut</h2>
+          <h2 className="mb-3 font-display text-base font-bold">Type & dates</h2>
+          {!initial && (
+            <div className="mb-4 inline-flex rounded-full border border-line bg-white p-1">
+              <button onClick={() => setDocType("facture")} className={`rounded-full px-4 py-1.5 text-sm font-semibold ${docType === "facture" ? "bg-ink text-paper" : "text-mut"}`}>Facture</button>
+              <button onClick={() => setDocType("devis")} className={`rounded-full px-4 py-1.5 text-sm font-semibold ${docType === "devis" ? "bg-ink text-paper" : "text-mut"}`}>Devis</button>
+            </div>
+          )}
           <div className="grid gap-3 sm:grid-cols-2">
             <div><p className={label}>Date d'émission</p><input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className={field} /></div>
-            <div><p className={label}>Échéance</p><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={field} /></div>
-            <div><p className={label}>Date de prestation</p><input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} className={field} /></div>
+            {docType === "devis" ? (
+              <div><p className={label}>Validité jusqu'au</p><input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={field} /></div>
+            ) : (
+              <div><p className={label}>Échéance</p><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={field} /></div>
+            )}
+            {docType === "facture" && (
+              <div><p className={label}>Date de prestation</p><input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} className={field} /></div>
+            )}
             <div>
               <p className={label}>Statut</p>
               <select value={status} onChange={(e) => setStatus(e.target.value)} className={field}>
