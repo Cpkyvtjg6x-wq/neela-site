@@ -33,6 +33,7 @@ export type Call = {
 
 // Régions françaises par département (pour regrouper la prospection).
 export const REGIONS: Record<string, string[]> = {
+  "Île-de-France": ["75", "77", "78", "91", "92", "93", "94", "95"],
   "Nouvelle-Aquitaine": ["17", "33", "40", "64"],
   Occitanie: ["34", "30", "31", "11", "66"],
   "Provence-Alpes-Côte d'Azur": ["06", "13", "83", "84", "04", "05"],
