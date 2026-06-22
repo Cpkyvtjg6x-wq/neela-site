@@ -94,15 +94,28 @@ export default function InvoiceEditor({
     w.document.close();
   }
 
-  function save(then?: (number: string, id: string) => void) {
+  function save() {
     setErr(null);
     if (!client.nom.trim()) { setErr("Le nom du client est obligatoire."); return; }
     start(async () => {
       const res = await saveInvoice(payload());
       if (!res.ok) { setErr(res.error || "Erreur lors de l'enregistrement."); return; }
       router.refresh();
-      if (then) then(res.number || initial?.number || "—", res.id || initial?.id || "");
-      else onClose();
+      onClose();
+    });
+  }
+
+  function saveAndExport() {
+    setErr(null);
+    if (!client.nom.trim()) { setErr("Le nom du client est obligatoire."); return; }
+    // On ouvre la fenêtre AVANT l'await (sinon le navigateur la bloque comme pop-up).
+    const w = window.open("", "_blank", "width=860,height=1040");
+    start(async () => {
+      const res = await saveInvoice(payload());
+      if (!res.ok) { setErr(res.error || "Erreur lors de l'enregistrement."); w?.close(); return; }
+      router.refresh();
+      const html = invoiceHTML(buildInvoice(res.number || initial?.number || "—", res.id || initial?.id || ""));
+      if (w) { w.document.write(html); w.document.close(); } else { openPrint(html); }
     });
   }
 
@@ -259,7 +272,7 @@ export default function InvoiceEditor({
         <button onClick={() => save()} disabled={pending} className="inline-flex items-center gap-2 rounded-xl bg-ink px-5 py-2.5 text-sm font-semibold text-paper hover:bg-accent disabled:opacity-60">
           <Save size={16} /> {pending ? "Enregistrement…" : "Enregistrer"}
         </button>
-        <button onClick={() => save((number, id) => openPrint(invoiceHTML(buildInvoice(number, id))))} disabled={pending} className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
+        <button onClick={saveAndExport} disabled={pending} className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
           <FileDown size={16} /> Enregistrer & exporter PDF
         </button>
       </div>
