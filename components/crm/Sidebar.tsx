@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
+  Headphones,
+  Columns3,
   CalendarDays,
   PhoneCall,
   Calculator,
@@ -17,6 +19,8 @@ import { logout } from "@/app/crm/actions";
 const NAV = [
   { href: "/crm", label: "Tableau de bord", icon: LayoutDashboard, match: (p: string) => p === "/crm" },
   { href: "/crm/prospects", label: "Prospects", icon: Users, match: (p: string) => p.startsWith("/crm/prospect") },
+  { href: "/crm/session", label: "Session d'appels", icon: Headphones, match: (p: string) => p.startsWith("/crm/session") },
+  { href: "/crm/pipeline", label: "Pipeline", icon: Columns3, match: (p: string) => p.startsWith("/crm/pipeline") },
   { href: "/crm/agenda", label: "Agenda", icon: CalendarDays, match: (p: string) => p.startsWith("/crm/agenda") },
   { href: "/crm/journal", label: "Journal", icon: PhoneCall, match: (p: string) => p.startsWith("/crm/journal") },
   { href: "/crm/ad-planner", label: "Ad Planner", icon: Calculator, match: (p: string) => p.startsWith("/crm/ad-planner") },

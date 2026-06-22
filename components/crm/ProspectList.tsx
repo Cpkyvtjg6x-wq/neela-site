@@ -1,19 +1,42 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { Prospect } from "@/lib/crm";
 import { statutLabel, interetMeta, regionForDept, REGIONS, STATUTS, INTERETS, prospectScore, scoreTier } from "@/lib/crm";
 import { useFiche } from "./FicheModal";
 
 export default function ProspectList({ prospects }: { prospects: Prospect[] }) {
   const { open } = useFiche();
-  const [q, setQ] = useState("");
-  const [dept, setDept] = useState("");
-  const [region, setRegion] = useState("");
-  const [interet, setInteret] = useState("");
-  const [statut, setStatut] = useState("");
-  const [groupBy, setGroupBy] = useState<"" | "region" | "departement" | "ville">("region");
-  const [sortBy, setSortBy] = useState<"priorite" | "nom" | "recent" | "departement">("priorite");
+  const sp = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const [q, setQ] = useState(sp.get("q") ?? "");
+  const [dept, setDept] = useState(sp.get("dept") ?? "");
+  const [region, setRegion] = useState(sp.get("region") ?? "");
+  const [interet, setInteret] = useState(sp.get("interet") ?? "");
+  const [statut, setStatut] = useState(sp.get("statut") ?? "");
+  const [groupBy, setGroupBy] = useState<"" | "region" | "departement" | "ville">(
+    (sp.get("group") ?? "region") as "" | "region" | "departement" | "ville"
+  );
+  const [sortBy, setSortBy] = useState<"priorite" | "nom" | "recent" | "departement">(
+    (sp.get("sort") ?? "priorite") as "priorite" | "nom" | "recent" | "departement"
+  );
+
+  // Mémorise les filtres / tri dans l'URL pour retrouver son contexte au retour.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (q.trim()) params.set("q", q.trim());
+    if (dept) params.set("dept", dept);
+    if (region) params.set("region", region);
+    if (interet) params.set("interet", interet);
+    if (statut) params.set("statut", statut);
+    if (groupBy !== "region") params.set("group", groupBy);
+    if (sortBy !== "priorite") params.set("sort", sortBy);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [q, dept, region, interet, statut, groupBy, sortBy, pathname, router]);
 
   const depts = useMemo(
     () =>
