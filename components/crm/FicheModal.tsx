@@ -206,10 +206,10 @@ function FicheModal({
               )}
             </div>
 
-            <div className="mt-4 text-right">
-              <Link href={`/crm/prospect/${p.id}`} onClick={onClose} className="text-xs text-accent hover:underline">
-                Ouvrir la fiche complète →
-              </Link>
+            <div className="mt-4 flex flex-wrap items-center justify-end gap-3 text-xs">
+              <Link href={`/crm/factures?new=1&prospect=${p.id}`} onClick={onClose} className="text-accent hover:underline">Facturer</Link>
+              <Link href={`/crm/ad-planner?ville=${encodeURIComponent(p.ville ?? "")}&centre=${encodeURIComponent(p.nom ?? "")}`} onClick={onClose} className="text-accent hover:underline">Simuler campagne</Link>
+              <Link href={`/crm/prospect/${p.id}`} onClick={onClose} className="text-accent hover:underline">Fiche complète →</Link>
             </div>
           </div>
         )}

@@ -179,16 +179,19 @@ export default async function StatsPage() {
 
         {/* Répartition par statut */}
         <div className={card}>
-          <h2 className="mb-4 font-display text-lg font-bold">Répartition par statut</h2>
-          <div className="space-y-2.5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-display text-lg font-bold">Répartition par statut</h2>
+            <Link href="/crm/pipeline" className="text-sm text-accent hover:underline">Pipeline →</Link>
+          </div>
+          <div className="space-y-1">
             {statutCounts.map((s) => (
-              <div key={s.key} className="flex items-center gap-3">
+              <Link key={s.key} href="/crm/pipeline" className="-mx-1 flex items-center gap-3 rounded-lg px-1 py-1 transition-colors hover:bg-paper">
                 <span className="w-28 shrink-0 text-sm text-mut">{statutLabel(s.key)}</span>
                 <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-paper">
                   <div className="h-full rounded-full bg-accent" style={{ width: `${(s.n / maxStatut) * 100}%` }} />
                 </div>
                 <span className="w-8 shrink-0 text-right text-sm font-semibold">{s.n}</span>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

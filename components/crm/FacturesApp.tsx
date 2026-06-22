@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Plus, FileDown, Pencil, Trash2, Copy, ArrowRightCircle } from "lucide-react";
+import Link from "next/link";
+import { Plus, FileDown, Pencil, Trash2, Copy, ArrowRightCircle, User } from "lucide-react";
 import { invoiceHTML, eur2, STATUTS_FACTURE, type Invoice } from "@/lib/invoices";
 import { setInvoiceStatus, deleteInvoice, duplicateInvoiceNextMonth, convertDevisToInvoice } from "@/app/crm/actions";
 import InvoiceEditor from "./InvoiceEditor";
@@ -18,8 +19,17 @@ function openPrint(html: string) {
   w.document.close();
 }
 
-export default function FacturesApp({ invoices, centres }: { invoices: Invoice[]; centres: Centre[] }) {
-  const [editing, setEditing] = useState<Invoice | "new" | null>(null);
+export default function FacturesApp({
+  invoices, centres, openProspect,
+}: {
+  invoices: Invoice[];
+  centres: Centre[];
+  openProspect?: { id: string; nom: string; email: string | null };
+}) {
+  const [prefill, setPrefill] = useState(
+    openProspect ? { prospectId: openProspect.id, nom: openProspect.nom, email: openProspect.email } : undefined
+  );
+  const [editing, setEditing] = useState<Invoice | "new" | null>(openProspect ? "new" : null);
   const [filter, setFilter] = useState<"tout" | "facture" | "devis">("tout");
   const [pending, start] = useTransition();
 
@@ -37,7 +47,14 @@ export default function FacturesApp({ invoices, centres }: { invoices: Invoice[]
   );
 
   if (editing) {
-    return <InvoiceEditor initial={editing === "new" ? null : editing} centres={centres} onClose={() => setEditing(null)} />;
+    return (
+      <InvoiceEditor
+        initial={editing === "new" ? null : editing}
+        prefill={editing === "new" ? prefill : undefined}
+        centres={centres}
+        onClose={() => { setEditing(null); setPrefill(undefined); }}
+      />
+    );
   }
 
   return (
@@ -47,7 +64,7 @@ export default function FacturesApp({ invoices, centres }: { invoices: Invoice[]
           <h1 className="font-display text-2xl font-bold tracking-tight">Factures</h1>
           <p className="mt-1 text-sm text-mut">{invoices.length} document(s) · factures & devis · numérotation automatique</p>
         </div>
-        <button onClick={() => setEditing("new")} className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-semibold text-paper hover:bg-accent">
+        <button onClick={() => { setPrefill(undefined); setEditing("new"); }} className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-semibold text-paper hover:bg-accent">
           <Plus size={16} /> Nouvelle facture
         </button>
       </div>
@@ -98,11 +115,14 @@ export default function FacturesApp({ invoices, centres }: { invoices: Invoice[]
                     {STATUTS_FACTURE.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                   </select>
                   <div className="flex shrink-0 gap-1">
+                    {inv.prospect_id && (
+                      <Link href={`/crm/prospect/${inv.prospect_id}`} title="Ouvrir la fiche prospect" className="rounded-md border border-line p-1.5 text-mut hover:text-accent"><User size={14} /></Link>
+                    )}
                     {isDevis && (
                       <button onClick={() => start(async () => { await convertDevisToInvoice(inv.id); })} disabled={pending} title="Convertir en facture" className="rounded-md border border-line p-1.5 text-emerald-600 hover:bg-emerald-50"><ArrowRightCircle size={14} /></button>
                     )}
                     <button onClick={() => start(async () => { await duplicateInvoiceNextMonth(inv.id); })} disabled={pending} title="Dupliquer pour le mois suivant" className="rounded-md border border-line p-1.5 text-mut hover:text-ink"><Copy size={14} /></button>
-                    <button onClick={() => setEditing(inv)} title="Modifier" className="rounded-md border border-line p-1.5 text-mut hover:text-ink"><Pencil size={14} /></button>
+                    <button onClick={() => { setPrefill(undefined); setEditing(inv); }} title="Modifier" className="rounded-md border border-line p-1.5 text-mut hover:text-ink"><Pencil size={14} /></button>
                     <button onClick={() => openPrint(invoiceHTML(inv))} title="Exporter PDF" className="rounded-md border border-line p-1.5 text-accent hover:bg-accent/10"><FileDown size={14} /></button>
                     <button
                       onClick={() => { if (confirm(`Supprimer ${inv.number} ?`)) start(async () => { await deleteInvoice(inv.id); }); }}

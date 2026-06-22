@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FileText, Calculator } from "lucide-react";
 import { getDb } from "@/lib/supabaseAdmin";
 import { getProspectActivity } from "@/lib/crmData";
 import { aiEnabled } from "@/lib/ai";
@@ -75,7 +76,17 @@ export default async function ProspectPage({ params }: { params: { id: string } 
               Appeler {p.telephone}
             </a>
           )}
-          <DeleteProspectButton id={p.id} nom={p.nom} />
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Link href={`/crm/factures?new=1&prospect=${p.id}`}
+              className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:border-accent hover:text-accent">
+              <FileText size={13} /> Facturer
+            </Link>
+            <Link href={`/crm/ad-planner?ville=${encodeURIComponent(p.ville ?? "")}&centre=${encodeURIComponent(p.nom ?? "")}`}
+              className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:border-accent hover:text-accent">
+              <Calculator size={13} /> Simuler
+            </Link>
+            <DeleteProspectButton id={p.id} nom={p.nom} />
+          </div>
         </div>
       </div>
 

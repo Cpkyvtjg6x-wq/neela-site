@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { Target, Wallet, ShieldCheck, Gauge, Rocket, AlertTriangle, CheckCircle2, MapPin, FileDown, TrendingUp, Sliders, Layers, Search, Sparkles } from "lucide-react";
 
 type Commune = { nom: string; codeDepartement: string; departement?: { nom: string; code: string }; population: number };
@@ -123,6 +124,7 @@ function Slider({
 }
 
 export default function AdPlanner({ centres = [] }: { centres?: { nom: string; ville: string | null }[] }) {
+  const sp = useSearchParams(); // liaison interne : ?ville=&centre= (depuis une fiche prospect)
   const [mode, setMode] = useState<"objectif" | "budget">("objectif");
   const [targetRdv, setTargetRdv] = useState(20);
   const [budget, setBudget] = useState(1000);
@@ -141,9 +143,9 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   const [fee, setFee] = useState(990);
   const [pop55, setPop55] = useState(12000);
 
-  const [centreName, setCentreName] = useState("");
+  const [centreName, setCentreName] = useState(sp.get("centre") ?? "");
 
-  const [cityQuery, setCityQuery] = useState("");
+  const [cityQuery, setCityQuery] = useState(sp.get("ville") ?? "");
   const [citySug, setCitySug] = useState<Commune[]>([]);
   const [city, setCity] = useState<Commune | null>(null);
   const [compLevel, setCompLevel] = useState<"faible" | "moyenne" | "forte">("moyenne");

@@ -25,18 +25,22 @@ export default function InvoiceEditor({
   initial,
   centres,
   onClose,
+  prefill,
 }: {
   initial: Invoice | null;
   centres: Centre[];
   onClose: () => void;
+  prefill?: { prospectId: string; nom: string; email?: string | null };
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
   const [emitter, setEmitter] = useState<InvoiceEmitter>(initial?.emitter ?? EMPTY_EMITTER);
-  const [client, setClient] = useState<InvoiceClient>(initial?.client ?? EMPTY_CLIENT);
-  const [prospectId, setProspectId] = useState<string | null>(initial?.prospect_id ?? null);
+  const [client, setClient] = useState<InvoiceClient>(
+    initial?.client ?? (prefill ? { ...EMPTY_CLIENT, nom: prefill.nom, email: prefill.email ?? "" } : EMPTY_CLIENT)
+  );
+  const [prospectId, setProspectId] = useState<string | null>(initial?.prospect_id ?? prefill?.prospectId ?? null);
   const [issueDate, setIssueDate] = useState(initial?.issue_date ?? todayISO());
   const [dueDate, setDueDate] = useState(initial?.due_date ?? addDaysISO(todayISO(), 30));
   const [saleDate, setSaleDate] = useState(initial?.sale_date ?? "");
