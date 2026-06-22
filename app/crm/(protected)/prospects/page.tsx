@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { getAllProspects, getAllCalls } from "@/lib/crmData";
+import { getAllProspects, getContactedProspectIds } from "@/lib/crmData";
 import ProspectList from "@/components/crm/ProspectList";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProspectsPage() {
-  const [prospects, calls] = await Promise.all([getAllProspects(), getAllCalls()]);
-  const contacted = new Set(calls.map((c) => c.prospect_id));
+  const [prospects, contacted] = await Promise.all([getAllProspects(), getContactedProspectIds()]);
   const aContacter = prospects.filter((p) => !contacted.has(p.id));
   const chauds = aContacter.filter((p) => p.interet === "chaud").length;
 

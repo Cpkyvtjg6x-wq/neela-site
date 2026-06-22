@@ -67,6 +67,21 @@ function revalidateCrm(prospectId?: string) {
   if (prospectId) revalidatePath(`/crm/prospect/${prospectId}`);
 }
 
+// Journal d'audit léger — best-effort : ne doit jamais casser l'action principale.
+async function logActivity(
+  db: ReturnType<typeof getDb>,
+  prospectId: string | null,
+  type: string,
+  payload: Record<string, unknown> = {}
+) {
+  if (!prospectId) return;
+  try {
+    await db.from("neela_activity").insert({ prospect_id: prospectId, type, payload });
+  } catch {
+    /* l'audit est secondaire */
+  }
+}
+
 export async function logout() {
   cookies().delete(AUTH_COOKIE);
   redirect("/crm/login");
@@ -118,8 +133,16 @@ export async function updateProspect(formData: FormData) {
     throw new Error("Téléphone invalide : indique un numéro à 10 chiffres (ex. 06 12 34 56 78).");
   }
   const db = getDb();
+  let prevStatut: string | null = null;
+  if (typeof patch.statut === "string") {
+    const { data: prev } = await db.from("neela_prospects").select("statut").eq("id", id).single();
+    prevStatut = prev?.statut ?? null;
+  }
   const { error } = await db.from("neela_prospects").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
+  if (typeof patch.statut === "string" && patch.statut !== prevStatut) {
+    await logActivity(db, id, "statut", { from: prevStatut, to: patch.statut });
+  }
   revalidateCrm(id);
 }
 
@@ -193,8 +216,17 @@ export async function addCall(formData: FormData) {
       source: rtype,
     });
     if (apptErr) throw new Error(apptErr.message);
+    await logActivity(db, prospectId, rtype === "r1" ? "r1" : "rappel", { at: rappel_at });
     revalidatePath("/crm/agenda");
   }
+
+  await logActivity(db, prospectId, "call", {
+    outcome: outcome || null,
+    statut: effectiveStatut || null,
+    interet: interet || null,
+    hasAudio: !!recording_path,
+    note: notes ? notes.slice(0, 280) : null,
+  });
 
   revalidateCrm(prospectId);
 }
@@ -269,6 +301,7 @@ export async function addAppointment(formData: FormData) {
     source: "manuel",
   });
   if (error) throw new Error(error.message);
+  await logActivity(db, prospectId, "rdv", { at: start_at, name: String(formData.get("name") || "") || null });
   revalidatePath("/crm/agenda");
   revalidatePath("/crm");
 }
@@ -298,6 +331,90 @@ export async function clearRappel(formData: FormData) {
   }
   revalidateCrm(prospectId || undefined);
   revalidatePath("/crm/agenda");
+}
+
+// --- Édition / suppression (Lot A) ---
+
+// Corrige un appel mal saisi (résultat, notes, intérêt, tags, rappel) + re-synchronise l'agenda.
+export async function updateCall(formData: FormData) {
+  assertAuth();
+  const db = getDb();
+  const callId = String(formData.get("call_id"));
+  if (!callId) throw new Error("Appel introuvable.");
+  const { data: call } = await db.from("neela_calls").select("prospect_id").eq("id", callId).single();
+  const prospectId = (call?.prospect_id as string) || String(formData.get("prospect_id") || "");
+
+  const outcome = String(formData.get("outcome") || "");
+  const notes = String(formData.get("notes") || "");
+  const interet = String(formData.get("interet") || "");
+  const tags = parseTags(formData.get("tags"));
+  const rappel_at = localParisToISO(String(formData.get("rappel_at") || ""));
+  if (interet && !INTERET_KEYS.has(interet)) throw new Error("Intérêt invalide.");
+
+  const { error } = await db.from("neela_calls").update({
+    outcome: outcome || null,
+    notes: notes || null,
+    interet: interet || null,
+    tags,
+    rappel_at,
+  }).eq("id", callId);
+  if (error) throw new Error(error.message);
+
+  if (prospectId) {
+    await db.from("neela_appointments").delete().eq("prospect_id", prospectId).in("source", ["rappel", "r1"]);
+    if (rappel_at) {
+      const rtype = String(formData.get("rappel_type") || "rappel") === "r1" ? "r1" : "rappel";
+      const { data: pr } = await db.from("neela_prospects").select("nom").eq("id", prospectId).single();
+      await db.from("neela_appointments").insert({ prospect_id: prospectId, start_at: rappel_at, name: pr?.nom ?? null, status: "reserve", source: rtype });
+    }
+    await logActivity(db, prospectId, "call_edit", { call_id: callId, outcome: outcome || null });
+  }
+  revalidateCrm(prospectId || undefined);
+  revalidatePath("/crm/agenda");
+}
+
+// Supprime un appel (et son audio + rappel d'agenda éventuel).
+export async function deleteCall(formData: FormData) {
+  assertAuth();
+  const db = getDb();
+  const callId = String(formData.get("call_id"));
+  if (!callId) throw new Error("Appel introuvable.");
+  const { data: call } = await db.from("neela_calls").select("prospect_id, recording_path, rappel_at").eq("id", callId).single();
+  const prospectId = (call?.prospect_id as string) || null;
+  if (call?.recording_path) {
+    await db.storage.from("neela-recordings").remove([call.recording_path as string]);
+  }
+  const { error } = await db.from("neela_calls").delete().eq("id", callId);
+  if (error) throw new Error(error.message);
+  if (prospectId && call?.rappel_at) {
+    await db.from("neela_appointments").delete().eq("prospect_id", prospectId).in("source", ["rappel", "r1"]);
+  }
+  await logActivity(db, prospectId, "call_delete", { call_id: callId });
+  revalidateCrm(prospectId || undefined);
+  revalidatePath("/crm/agenda");
+}
+
+// Supprime un prospect et tout ce qui en dépend (FK sans cascade : on nettoie à la main).
+export async function deleteProspect(formData: FormData) {
+  assertAuth();
+  const db = getDb();
+  const id = String(formData.get("id"));
+  if (!id) throw new Error("Prospect introuvable.");
+
+  const { data: calls } = await db.from("neela_calls").select("recording_path").eq("prospect_id", id);
+  const paths = (calls ?? []).map((c) => c.recording_path).filter(Boolean) as string[];
+  if (paths.length) await db.storage.from("neela-recordings").remove(paths);
+
+  await db.from("neela_invoices").update({ prospect_id: null }).eq("prospect_id", id);
+  await db.from("neela_contact_messages").update({ prospect_id: null }).eq("prospect_id", id);
+  await db.from("neela_appointments").delete().eq("prospect_id", id);
+  await db.from("neela_calls").delete().eq("prospect_id", id);
+  const { error } = await db.from("neela_prospects").delete().eq("id", id); // neela_activity en cascade
+  if (error) throw new Error(error.message);
+
+  revalidateCrm();
+  revalidatePath("/crm/agenda");
+  redirect("/crm/prospects");
 }
 
 // Import d'un appel depuis l'ancien CRM (relié au prospect par son nom)
