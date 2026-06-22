@@ -6,6 +6,7 @@ import type { Prospect } from "@/lib/crm";
 import { statutLabel, interetMeta, regionForDept, prospectScore, scoreTier } from "@/lib/crm";
 import { telHref } from "@/lib/telephony";
 import InteractionForm from "./InteractionForm";
+import SmsTemplates from "./SmsTemplates";
 import Tag from "./Tag";
 
 // ⚠️ À PERSONNALISER : ton script d'appel par défaut (modifiable en direct).
@@ -96,6 +97,7 @@ export default function CallSession({ queue }: { queue: Prospect[] }) {
             ) : (
               <p className="mt-4 text-sm text-amber-700">Aucun numéro renseigné pour ce prospect.</p>
             )}
+            {p.telephone && <div className="mt-4 border-t border-line pt-4"><SmsTemplates phone={p.telephone} nom={p.nom} /></div>}
           </div>
 
           {/* Enregistre l'appel puis passe au suivant */}

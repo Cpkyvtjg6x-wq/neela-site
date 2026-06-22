@@ -9,6 +9,7 @@ import ProspectInfoForm from "@/components/crm/ProspectInfoForm";
 import CallHistory from "@/components/crm/CallHistory";
 import Timeline from "@/components/crm/Timeline";
 import DeleteProspectButton from "@/components/crm/DeleteProspectButton";
+import SmsTemplates from "@/components/crm/SmsTemplates";
 import Tag from "@/components/crm/Tag";
 
 export const dynamic = "force-dynamic";
@@ -82,6 +83,11 @@ export default async function ProspectPage({ params }: { params: { id: string } 
         <div className="space-y-6">
           <InteractionForm prospectId={p.id} prospectName={p.nom} />
           <ProspectInfoForm p={p} />
+          {p.telephone && (
+            <div className="rounded-2xl border border-line bg-white p-5">
+              <SmsTemplates phone={p.telephone} nom={p.nom} />
+            </div>
+          )}
         </div>
 
         {/* Colonne droite : historique éditable + timeline */}

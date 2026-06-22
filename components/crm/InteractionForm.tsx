@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Mic, Square, Trash2 } from "lucide-react";
 import { OUTCOMES, INTERETS } from "@/lib/crm";
 import { addCall } from "@/app/crm/actions";
+import { NOTE_TEMPLATES, fillTemplate } from "@/lib/templates";
 import TagInput from "./TagInput";
 import { useRecorder, fmtElapsed } from "./RecordingProvider";
 
@@ -119,6 +120,18 @@ export default function InteractionForm({
 
       <div className="mt-3">
         <p className={label}>Commentaire</p>
+        <div className="mb-1.5 mt-1 flex flex-wrap gap-1.5">
+          {NOTE_TEMPLATES.map((t) => (
+            <button
+              type="button"
+              key={t.label}
+              onClick={() => set({ notes: (d.notes.trim() ? d.notes.trim() + "\n" : "") + fillTemplate(t.text, { nom: prospectName ?? "" }) })}
+              className="rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-mut hover:border-accent hover:text-accent"
+            >
+              + {t.label}
+            </button>
+          ))}
+        </div>
         <textarea
           value={d.notes}
           onChange={(e) => set({ notes: e.target.value })}
