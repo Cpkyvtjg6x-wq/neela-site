@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/supabaseAdmin";
 import { getProspectActivity } from "@/lib/crmData";
+import { aiEnabled } from "@/lib/ai";
 import type { Prospect, Call } from "@/lib/crm";
 import { interetMeta, regionForDept, statutLabel } from "@/lib/crm";
 import InteractionForm from "@/components/crm/InteractionForm";
@@ -94,7 +95,7 @@ export default async function ProspectPage({ params }: { params: { id: string } 
         <div className="space-y-8">
           <div>
             <h2 className="mb-4 font-display text-lg font-bold">Historique des appels</h2>
-            <CallHistory calls={calls} audio={audio} prospectId={p.id} />
+            <CallHistory calls={calls} audio={audio} prospectId={p.id} aiEnabled={aiEnabled()} />
           </div>
           <div>
             <h2 className="mb-4 font-display text-lg font-bold">Activité</h2>

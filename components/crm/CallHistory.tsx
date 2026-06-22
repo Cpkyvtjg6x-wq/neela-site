@@ -2,10 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2, Mic } from "lucide-react";
+import { Pencil, Trash2, Mic, Sparkles } from "lucide-react";
 import type { Call } from "@/lib/crm";
 import { OUTCOMES, INTERETS, outcomeLabel } from "@/lib/crm";
 import { updateCall, deleteCall } from "@/app/crm/actions";
+import { summarizeRecording } from "@/app/crm/ai-actions";
 import TagInput from "./TagInput";
 import Tag from "./Tag";
 import ConfirmButton from "./ConfirmButton";
@@ -27,11 +28,22 @@ function isoToParisLocal(iso: string) {
   return `${p.year}-${p.month}-${p.day}T${h}:${p.minute}`;
 }
 
-function CallRow({ call, url, prospectId }: { call: Call; url: string | null; prospectId: string }) {
+function CallRow({ call, url, prospectId, aiEnabled }: { call: Call; url: string | null; prospectId: string; aiEnabled: boolean }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
+  const [aiPending, setAiPending] = useState(false);
+
+  function runAi() {
+    setErr(null);
+    setAiPending(true);
+    summarizeRecording(call.id).then((r) => {
+      setAiPending(false);
+      if (r.ok) router.refresh();
+      else setErr(r.error || "Analyse IA indisponible.");
+    });
+  }
 
   const [outcome, setOutcome] = useState(call.outcome ?? "");
   const [interet, setInteret] = useState(call.interet ?? "");
@@ -100,6 +112,9 @@ function CallRow({ call, url, prospectId }: { call: Call; url: string | null; pr
         <span className="text-[13px] font-bold text-ink">{outcomeLabel(call.outcome)}</span>
         <div className="flex items-center gap-2">
           <span className="text-[12px] text-mut">{fmt(call.created_at)}</span>
+          {aiEnabled && call.recording_path && (
+            <button onClick={runAi} disabled={aiPending} title="Résumer l'appel avec l'IA" className="rounded-md border border-line p-1 text-purple-600 hover:bg-purple-50 disabled:opacity-50"><Sparkles size={13} /></button>
+          )}
           <button onClick={() => setEditing(true)} title="Modifier" className="rounded-md border border-line p-1 text-mut hover:text-ink"><Pencil size={13} /></button>
           <ConfirmButton title="Supprimer cet appel ?" message="L'appel et son enregistrement audio seront supprimés." confirmLabel="Supprimer" danger onConfirm={del}
             className="rounded-md border border-line p-1 text-red-600 hover:bg-red-50"><Trash2 size={13} /></ConfirmButton>
@@ -114,11 +129,13 @@ function CallRow({ call, url, prospectId }: { call: Call; url: string | null; pr
         {call.recording_path && <span className="inline-flex items-center gap-1 text-accent"><Mic size={12} /> audio</span>}
         {call.rappel_at && <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-700">Rappel : {fmt(call.rappel_at)}</span>}
       </div>
+      {aiPending && <p className="mt-2 text-[12px] text-mut">Analyse IA en cours…</p>}
+      {err && <p className="mt-2 text-[12px] font-medium text-red-600">{err}</p>}
     </div>
   );
 }
 
-export default function CallHistory({ calls, audio, prospectId }: { calls: Call[]; audio: Record<string, string>; prospectId: string }) {
+export default function CallHistory({ calls, audio, prospectId, aiEnabled = false }: { calls: Call[]; audio: Record<string, string>; prospectId: string; aiEnabled?: boolean }) {
   if (calls.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-line p-6 text-center text-sm text-mut">
@@ -128,7 +145,7 @@ export default function CallHistory({ calls, audio, prospectId }: { calls: Call[
   }
   return (
     <div className="space-y-3">
-      {calls.map((c) => <CallRow key={c.id} call={c} url={audio[c.id] ?? null} prospectId={prospectId} />)}
+      {calls.map((c) => <CallRow key={c.id} call={c} url={audio[c.id] ?? null} prospectId={prospectId} aiEnabled={aiEnabled} />)}
     </div>
   );
 }
