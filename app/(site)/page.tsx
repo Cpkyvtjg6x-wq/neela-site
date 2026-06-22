@@ -11,7 +11,7 @@ import Steps from "@/components/Steps";
 import GuaranteeBand from "@/components/GuaranteeBand";
 import ForWho from "@/components/ForWho";
 import Testimonials from "@/components/Testimonials";
-import Founder from "@/components/Founder";
+// import Founder from "@/components/Founder"; // masqué temporairement (pas de photo)
 import Faq from "@/components/Faq";
 
 const STATS = [
@@ -155,8 +155,8 @@ export default function HomePage() {
       {/* Méthode */}
       <Steps />
 
-      {/* Le fondateur */}
-      <Founder />
+      {/* Le fondateur — masqué tant qu'il n'y a pas de photo. Décommenter pour réactiver. */}
+      {/* <Founder /> */}
 
       <Marquee
         items={[
