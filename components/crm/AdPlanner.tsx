@@ -453,38 +453,6 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
         {/* Réglages */}
         <div className="min-w-0 space-y-6">
           <div className={card}>
-            <h2 className="mb-4 font-display text-base font-bold">{mode === "objectif" ? "Ton objectif" : "Le budget pub"}</h2>
-            {mode === "objectif"
-              ? <Slider label={V.objectif} value={targetRdv} set={setTargetRdv} min={5} max={60} />
-              : <Slider label="Budget pub mensuel (versé à Meta)" value={budget} set={setBudget} min={300} max={5000} step={50} suffix=" €" />}
-          </div>
-
-          <div className={card}>
-            <h2 className="mb-4 font-display text-base font-bold">Hypothèses publicité (ajustables)</h2>
-            <div className="space-y-4">
-              <Slider label="Coût par lead (CPL)" value={cpl} set={A(setCpl)} min={4} max={40} suffix=" €" />
-              <Slider label="Taux lead → RDV" value={leadToRdv} set={A(setLeadToRdv)} min={15} max={80} suffix=" %" />
-              <Slider label="Taux de présence au RDV" value={presence} set={A(setPresence)} min={50} max={95} suffix=" %" />
-              <Slider label={`Taux RDV → ${V.vente}`} value={closing} set={A(setClosing)} min={10} max={60} suffix=" %" />
-            </div>
-          </div>
-
-          <div className={card}>
-            <h2 className="mb-1 font-display text-base font-bold">Économie du centre</h2>
-            <p className="mb-4 text-xs text-mut">Marge mixte estimée : <b className="text-ink">{eur(blendedMarge)}</b> {V.margeUnit}</p>
-            <div className="space-y-4">
-              <Slider label={V.premiumLabel} value={partC2} set={setPartC2} min={0} max={100} suffix=" %" />
-              <Slider label={V.margePremiumLabel} value={margeC2} set={setMargeC2} min={50} max={3000} step={50} suffix=" €" />
-              <Slider label={V.margeBaseLabel} value={margeC1} set={setMargeC1} min={0} max={1000} step={25} suffix=" €" />
-              <Slider label="Tes honoraires / mois" value={fee} set={setFee} min={300} max={3000} step={10} suffix=" €" />
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-accent/30 bg-accent/5 p-3 text-xs">
-              <span className="text-mut">Honoraires recommandés pour rester concurrentiel : <b className="text-ink">{eur(feeReco)}</b> · fourchette {eur(feeLow)}–{eur(feeHigh)}</span>
-              <button onClick={() => setFee(feeReco)} className="ml-auto rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-white hover:opacity-90">Appliquer</button>
-            </div>
-          </div>
-
-          <div className={card}>
             <h2 className="mb-3 flex items-center gap-2 font-display text-base font-bold"><MapPin size={16} className="text-accent" /> Zone &amp; concurrence</h2>
 
             <div className="relative">
@@ -535,6 +503,38 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
                 <Search size={15} /> Voir les pubs Meta de la zone
               </a>
               <p className="mt-1.5 text-[11px] text-mut">Ouvre la bibliothèque publicitaire officielle Meta, pré-remplie ({V.adKeyword} {city?.nom || cityQuery || "…"}).</p>
+            </div>
+          </div>
+
+          <div className={card}>
+            <h2 className="mb-4 font-display text-base font-bold">{mode === "objectif" ? "Ton objectif" : "Le budget pub"}</h2>
+            {mode === "objectif"
+              ? <Slider label={V.objectif} value={targetRdv} set={setTargetRdv} min={5} max={60} />
+              : <Slider label="Budget pub mensuel (versé à Meta)" value={budget} set={setBudget} min={300} max={5000} step={50} suffix=" €" />}
+          </div>
+
+          <div className={card}>
+            <h2 className="mb-4 font-display text-base font-bold">Hypothèses publicité (ajustables)</h2>
+            <div className="space-y-4">
+              <Slider label="Coût par lead (CPL)" value={cpl} set={A(setCpl)} min={4} max={40} suffix=" €" />
+              <Slider label="Taux lead → RDV" value={leadToRdv} set={A(setLeadToRdv)} min={15} max={80} suffix=" %" />
+              <Slider label="Taux de présence au RDV" value={presence} set={A(setPresence)} min={50} max={95} suffix=" %" />
+              <Slider label={`Taux RDV → ${V.vente}`} value={closing} set={A(setClosing)} min={10} max={60} suffix=" %" />
+            </div>
+          </div>
+
+          <div className={card}>
+            <h2 className="mb-1 font-display text-base font-bold">Économie du centre</h2>
+            <p className="mb-4 text-xs text-mut">Marge mixte estimée : <b className="text-ink">{eur(blendedMarge)}</b> {V.margeUnit}</p>
+            <div className="space-y-4">
+              <Slider label={V.premiumLabel} value={partC2} set={setPartC2} min={0} max={100} suffix=" %" />
+              <Slider label={V.margePremiumLabel} value={margeC2} set={setMargeC2} min={50} max={3000} step={50} suffix=" €" />
+              <Slider label={V.margeBaseLabel} value={margeC1} set={setMargeC1} min={0} max={1000} step={25} suffix=" €" />
+              <Slider label="Tes honoraires / mois" value={fee} set={setFee} min={300} max={3000} step={10} suffix=" €" />
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-accent/30 bg-accent/5 p-3 text-xs">
+              <span className="text-mut">Honoraires recommandés pour rester concurrentiel : <b className="text-ink">{eur(feeReco)}</b> · fourchette {eur(feeLow)}–{eur(feeHigh)}</span>
+              <button onClick={() => setFee(feeReco)} className="ml-auto rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-white hover:opacity-90">Appliquer</button>
             </div>
           </div>
         </div>
