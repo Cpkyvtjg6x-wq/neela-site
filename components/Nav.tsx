@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useScroll, useSpring } from "framer-motion";
 import { EASE } from "@/lib/site";
 
 const LINKS = [
@@ -15,6 +15,14 @@ export default function Nav() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+
+  // Barre de progression de lecture (façon Apple/Stripe).
+  const { scrollYProgress } = useScroll();
+  const progress = useSpring(scrollYProgress, {
+    stiffness: 120,
+    damping: 30,
+    restDelta: 0.001,
+  });
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -40,9 +48,9 @@ export default function Nav() {
         <nav className="container-wide flex items-center justify-between">
           <Link
             href="/"
-            className="flex items-center gap-2.5 font-display text-xl font-bold tracking-tight"
+            className="group flex items-center gap-2.5 font-display text-xl font-bold tracking-tight"
           >
-            <span className="h-2.5 w-2.5 rounded-full bg-accent" />
+            <span className="h-2.5 w-2.5 rounded-full bg-accent transition-transform duration-300 group-hover:scale-125" />
             Neela
           </Link>
 
@@ -51,9 +59,10 @@ export default function Nav() {
               <Link
                 key={l.href}
                 href={l.href}
-                className="text-[15px] font-medium text-mut transition-colors hover:text-ink"
+                className="group relative text-[15px] font-medium text-mut transition-colors hover:text-ink"
               >
                 {l.label}
+                <span className="absolute -bottom-1.5 left-0 h-[2px] w-full origin-left scale-x-0 rounded-full bg-accent transition-transform duration-300 ease-out group-hover:scale-x-100" />
               </Link>
             ))}
             <Link
@@ -88,6 +97,15 @@ export default function Nav() {
             />
           </button>
         </nav>
+
+        {/* Barre de progression de lecture */}
+        <motion.div
+          aria-hidden
+          style={{ scaleX: progress }}
+          className={`absolute inset-x-0 bottom-0 h-[2px] origin-left bg-accent transition-opacity duration-300 ${
+            scrolled ? "opacity-100" : "opacity-0"
+          }`}
+        />
       </header>
 
       {/* Menu mobile plein écran */}

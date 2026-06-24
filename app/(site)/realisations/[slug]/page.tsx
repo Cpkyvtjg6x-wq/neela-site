@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { projects, getProject } from "@/lib/projects";
 import MagneticButton from "@/components/MagneticButton";
 
@@ -41,7 +42,18 @@ export default function ProjectPage({ params }: { params: { slug: string } }) {
       </h1>
       <p className="mt-4 text-lg text-mut">{p.client}</p>
 
-      <div className="mt-12 aspect-[16/8] overflow-hidden rounded-3xl bg-gradient-to-br from-accent to-ink" />
+      <div className="relative mt-12 aspect-[16/8] overflow-hidden rounded-3xl bg-gradient-to-br from-accent to-ink">
+        {p.image && (
+          <Image
+            src={p.image}
+            alt={p.title}
+            fill
+            priority
+            sizes="(max-width: 1240px) 100vw, 1240px"
+            className="object-cover"
+          />
+        )}
+      </div>
 
       <div className="mt-14 grid gap-12 md:grid-cols-[1.6fr_1fr]">
         <p className="text-xl leading-relaxed text-ink/85">{p.summary}</p>

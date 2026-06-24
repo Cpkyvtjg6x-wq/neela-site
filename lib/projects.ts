@@ -7,6 +7,8 @@ export type Project = {
   year: string;
   summary: string;
   result: string;
+  /** Visuel de couverture (dans /public). Si absent, on retombe sur un dégradé. */
+  image?: string;
 };
 
 export const projects: Project[] = [
@@ -19,6 +21,7 @@ export const projects: Project[] = [
     summary:
       "Campagne locale ciblée sur l'agglomération et les proches aidants, avec tunnel de prise de rendez-vous et relances automatiques.",
     result: "23 rendez-vous qualifiés le premier mois · 14 € par RDV",
+    image: "/ads/audio-femme-senior.webp",
   },
   {
     slug: "story-instagram-audition",
@@ -29,6 +32,7 @@ export const projects: Project[] = [
     summary:
       "Déclinaisons verticales plein écran, messages conformes à la réglementation santé, pensés pour l'audience senior et son entourage.",
     result: "92 % de taux de présence aux rendez-vous",
+    image: "/ads/audio-couple-story.webp",
   },
   {
     slug: "tunnel-rdv-automatise",
@@ -39,6 +43,18 @@ export const projects: Project[] = [
     summary:
       "Formulaire, agenda et relances SMS connectés. Le patient réserve, le centre n'a qu'à recevoir.",
     result: "Agenda du lundi rempli en continu",
+    image: "/ads/audio-consultation.webp",
+  },
+  {
+    slug: "optique-essai-monture",
+    title: "Faire venir en magasin d'optique",
+    client: "Optique indépendante · Hérault",
+    category: "Acquisition · Meta Ads",
+    year: "2026",
+    summary:
+      "Mise en avant de la nouvelle collection et de l'examen de vue, ciblage local sur la zone de chalandise, prise de rendez-vous en ligne et relances SMS.",
+    result: "Trafic magasin en hausse · coût par RDV maîtrisé",
+    image: "/ads/optique-essayage.webp",
   },
 ];
 
