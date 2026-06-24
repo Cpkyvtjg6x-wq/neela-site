@@ -138,6 +138,44 @@ html.lenis body {
   animation: screencycle 11s ease-in-out infinite;
 }
 
+/* ---- Écran data Meta « live » ---- */
+/* Barres du graphe qui montent à l'apparition. */
+@keyframes barRise {
+  from {
+    transform: scaleY(0.04);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+.anim-bar {
+  transform-origin: bottom;
+  animation: barRise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* Flux de notifications « Nouveau RDV » qui défilent en boucle. */
+@keyframes rdvpop {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  4% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  29% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  33%,
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+}
+.anim-rdvpop {
+  animation: rdvpop 9s ease-in-out infinite;
+}
+
 /* Respect de prefers-reduced-motion : on neutralise les animations lourdes */
 @media (prefers-reduced-motion: reduce) {
   *,

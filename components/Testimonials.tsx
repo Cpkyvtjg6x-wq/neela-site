@@ -3,15 +3,7 @@
 import { motion } from "framer-motion";
 import { Quote, Star } from "lucide-react";
 import Reveal from "./Reveal";
-import Counter from "./Counter";
 import { EASE } from "@/lib/site";
-
-// ⚠️ À PERSONNALISER : remplace par tes vrais résultats clients.
-const RESULTS = [
-  { prefix: "+", to: 27, suffix: " RDV", label: "par mois en moyenne / centre" },
-  { prefix: "−", to: 38, suffix: " %", label: "de coût par rendez-vous" },
-  { prefix: "", to: 48, suffix: " h", label: "pour lancer vos campagnes" },
-];
 
 // ⚠️ À PERSONNALISER : remplace par de vrais témoignages (avec accord du client).
 const TESTIMONIALS = [
@@ -54,23 +46,8 @@ export default function Testimonials() {
         </h2>
       </Reveal>
 
-      {/* Bandeau résultats */}
-      <div className="mt-14 grid gap-5 sm:grid-cols-3">
-        {RESULTS.map((r, i) => (
-          <Reveal key={r.label} delay={i * 0.06}>
-            <div className="rounded-3xl border border-line bg-white p-8 shadow-card">
-              <p className="font-display text-[clamp(2.2rem,4.6vw,3.2rem)] font-bold text-accent">
-                {r.prefix}
-                <Counter to={r.to} suffix={r.suffix} />
-              </p>
-              <p className="mt-2 text-[14px] font-medium text-mut">{r.label}</p>
-            </div>
-          </Reveal>
-        ))}
-      </div>
-
       {/* Témoignages */}
-      <div className="mt-5 grid gap-5 md:grid-cols-3">
+      <div className="mt-14 grid gap-5 md:grid-cols-3">
         {TESTIMONIALS.map((t, i) => (
           <motion.figure
             key={t.name}

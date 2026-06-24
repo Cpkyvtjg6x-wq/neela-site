@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus } from "lucide-react";
 import Reveal from "./Reveal";
@@ -49,6 +50,18 @@ export default function Faq() {
               <br />
               <span className="text-mut">avant même l'appel.</span>
             </h2>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <div className="relative mt-8 hidden aspect-[4/3] overflow-hidden rounded-3xl border border-line md:block">
+              <Image
+                src="/ads/accueil-secretaire.webp"
+                alt="Accueil chaleureux dans un centre de santé"
+                fill
+                sizes="(max-width: 1024px) 0px, 420px"
+                className="object-cover"
+              />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/15 to-transparent" />
+            </div>
           </Reveal>
         </div>
 
