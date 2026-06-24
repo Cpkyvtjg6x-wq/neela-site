@@ -54,8 +54,8 @@ export default function Faq() {
           <Reveal delay={0.1}>
             <div className="relative mt-8 hidden aspect-[4/3] overflow-hidden rounded-3xl border border-line md:block">
               <Image
-                src="/ads/accueil-secretaire.webp"
-                alt="Accueil chaleureux dans un centre de santé"
+                src="/ads/faq-conseil.webp"
+                alt="Conseil rassurant entre un conseiller et un patient"
                 fill
                 sizes="(max-width: 1024px) 0px, 420px"
                 className="object-cover"
