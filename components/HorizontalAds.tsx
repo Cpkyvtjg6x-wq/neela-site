@@ -135,10 +135,15 @@ export default function HorizontalAds() {
         setDist(Math.max(0, track.current.scrollWidth - window.innerWidth));
       }
     };
-    calc();
+    // Le rail n'existe que lorsque `allowed` est vrai : on (re)mesure APRÈS layout
+    // une fois le mode animé monté, sinon la distance reste à 0 (rail figé).
+    const raf = requestAnimationFrame(calc);
     window.addEventListener("resize", calc);
-    return () => window.removeEventListener("resize", calc);
-  }, []);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", calc);
+    };
+  }, [allowed]);
 
   const { scrollYProgress } = useScroll({
     target: section,

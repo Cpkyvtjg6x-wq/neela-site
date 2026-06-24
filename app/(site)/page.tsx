@@ -5,6 +5,7 @@ import Marquee from "@/components/Marquee";
 import MagneticButton from "@/components/MagneticButton";
 import Counter from "@/components/Counter";
 import HorizontalAds from "@/components/HorizontalAds";
+import Immersion3D from "@/components/Immersion3D";
 import Dashboard from "@/components/Dashboard";
 import Parallax from "@/components/Parallax";
 import Steps from "@/components/Steps";
@@ -97,6 +98,9 @@ export default function HomePage() {
 
       {/* Showcase pubs — défilé horizontal cinématique */}
       <HorizontalAds />
+
+      {/* Moment 3D — au-delà de l'écran (WebGL temps réel) */}
+      <Immersion3D />
 
       {/* Pour qui + offre incluse */}
       <ForWho />
