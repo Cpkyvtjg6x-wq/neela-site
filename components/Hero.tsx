@@ -6,6 +6,7 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { Check, CalendarCheck, TrendingUp } from "lucide-react";
 import MagneticButton from "./MagneticButton";
 import { EASE } from "@/lib/site";
+import { useMotionAllowed } from "@/lib/useCanRenderHeavy";
 
 const TITLE = ["On", "remplit", "l'agenda", "des", "centres", "de", "santé."];
 
@@ -23,6 +24,7 @@ const word = {
 
 export default function Hero() {
   const ref = useRef<HTMLElement>(null);
+  const allowed = useMotionAllowed();
 
   // Parallax doux du halo et du contenu pendant le scroll.
   const { scrollYProgress } = useScroll({
@@ -42,7 +44,7 @@ export default function Hero() {
       {/* Halo d'accent très diffus + grille subtile, en parallax */}
       <motion.div
         aria-hidden
-        style={{ y: glowY }}
+        style={allowed ? { y: glowY } : undefined}
         className="pointer-events-none absolute inset-0 -z-10"
       >
         <div className="absolute left-[18%] top-[14%] h-[620px] w-[620px] -translate-x-1/2 rounded-full bg-accent/20 blur-[130px]" />
@@ -52,7 +54,7 @@ export default function Hero() {
 
       <div className="container-wide grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr]">
         {/* Colonne texte */}
-        <motion.div style={{ y: contentY, opacity: contentOpacity }}>
+        <motion.div style={allowed ? { y: contentY, opacity: contentOpacity } : undefined}>
           <motion.div
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
@@ -63,7 +65,7 @@ export default function Hero() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
             </span>
-            Agence d'acquisition · Publicité Meta
+            Sites web · CRM · Campagnes Meta
           </motion.div>
 
           <h1 className="font-display font-bold leading-[0.98] tracking-[-0.03em] text-[clamp(2.5rem,6.4vw,5.4rem)]">
@@ -98,9 +100,9 @@ export default function Hero() {
             transition={{ duration: 0.8, ease: EASE, delay: 0.85 }}
             className="mt-7 max-w-xl text-lg font-medium leading-relaxed text-mut"
           >
-            Des campagnes Facebook &amp; Instagram qui transforment votre zone en
-            flux régulier de rendez-vous qualifiés. Création, ciblage, prise de
-            RDV — clé en main, et garanti.
+            Un site qui convertit, un CRM qui pilote, des campagnes Meta qui
+            remplissent l'agenda. Le système d'acquisition complet de votre
+            centre — conçu, connecté, et garanti.
           </motion.p>
 
           <motion.div
@@ -134,7 +136,7 @@ export default function Hero() {
 
         {/* Colonne visuelle immersive */}
         <motion.div
-          style={{ y: visualY }}
+          style={allowed ? { y: visualY } : undefined}
           initial={{ opacity: 0, scale: 0.94 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1, ease: EASE, delay: 0.5 }}

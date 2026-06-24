@@ -9,6 +9,7 @@ import Dashboard from "@/components/Dashboard";
 import Parallax from "@/components/Parallax";
 import Steps from "@/components/Steps";
 import GuaranteeBand from "@/components/GuaranteeBand";
+import LePont from "@/components/LePont";
 import ForWho from "@/components/ForWho";
 import Testimonials from "@/components/Testimonials";
 // import Founder from "@/components/Founder"; // masqué temporairement (pas de photo)
@@ -90,6 +91,9 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* Le Pont — les deux offres (Site + CRM) comme un système */}
+      <LePont />
 
       {/* Showcase pubs — défilé horizontal cinématique */}
       <HorizontalAds />

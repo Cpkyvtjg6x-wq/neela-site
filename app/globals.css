@@ -103,6 +103,41 @@ html.lenis body {
   box-shadow: 0 40px 90px rgba(16, 40, 90, 0.18);
 }
 
+/* ---- Maquettes vivantes (Le Pont) : auto-défilement transform-only ---- */
+/* Défilement continu d'une page de site (contenu dupliqué -> boucle nette). */
+@keyframes pagescroll {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-50%);
+  }
+}
+.anim-pagescroll {
+  animation: pagescroll 16s linear infinite;
+}
+/* Passage par paliers entre 3 écrans de CRM (strip à 3 écrans empilés). */
+@keyframes screencycle {
+  0%,
+  26% {
+    transform: translateY(0%);
+  }
+  33%,
+  59% {
+    transform: translateY(-33.333%);
+  }
+  66%,
+  92% {
+    transform: translateY(-66.666%);
+  }
+  100% {
+    transform: translateY(0%);
+  }
+}
+.anim-screencycle {
+  animation: screencycle 11s ease-in-out infinite;
+}
+
 /* Respect de prefers-reduced-motion : on neutralise les animations lourdes */
 @media (prefers-reduced-motion: reduce) {
   *,
