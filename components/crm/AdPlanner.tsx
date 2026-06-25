@@ -3,7 +3,9 @@
 import { useState, useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Target, Wallet, ShieldCheck, Gauge, Rocket, AlertTriangle, CheckCircle2, MapPin, FileDown, TrendingUp, Sliders, Layers, Search, Sparkles, FileText } from "lucide-react";
+import { Target, Wallet, ShieldCheck, Gauge, Rocket, AlertTriangle, CheckCircle2, MapPin, FileDown, TrendingUp, Sliders, Layers, Search, Sparkles, FileText, Users } from "lucide-react";
+import { CONFIG, METIER_TARGETING, TRANCHES, audienceMetaEstimee, type Metier, type Tranche, type PopParTranche } from "@/lib/adPlannerConfig";
+import { suggestAdresses, fetchCommune, popFallbackParTranche, type GeoPoint, type CommuneInfo } from "@/lib/geo";
 
 type Commune = { nom: string; codeDepartement: string; departement?: { nom: string; code: string }; population: number };
 
@@ -27,7 +29,7 @@ const SCENARIOS: Record<ScenKey, { cpl: number; leadToRdv: number; presence: num
 
 // Presets par métier : l'économie + le vocabulaire changent
 // (les hypothèses pub restent pilotées par les scénarios, universelles).
-type Metier = "audio" | "optique" | "dentaire";
+// Le type Metier + le ciblage géo/audience vivent dans lib/adPlannerConfig.ts.
 type Vocab = {
   label: string; objectif: string; vente: string; ventes: string;
   premiumLabel: string; margePremiumLabel: string; margeBaseLabel: string;
@@ -76,6 +78,8 @@ type Ctx = {
   marge: number; fee: number;
   ceiling: number; period: "apprentissage" | "regime";
   compMult: number;
+  // Ciblage géo (optionnels → comportement inchangé si non fournis).
+  audienceMeta?: number; cpmEur?: number; capFreq?: number;
 };
 
 // Saturation de zone : au-delà du plafond de leads, le CPL grimpe — PLAFONNÉ à ×2,5
@@ -115,7 +119,16 @@ function compute(a: Assum, c: Ctx) {
   const roas = totalCost > 0 ? margeGen / totalCost : 0;
   const profit = margeGen - totalCost;
   const breakEven = c.marge > 0 ? totalCost / c.marge : 0;
-  return { leads, budgetPub, rdv, presents, ventes, margeGen, coutParRdv, totalCost, roas, profit, util, effCpl, breakEven };
+  // Couverture publicitaire (reach / fréquence). audienceMeta = mesure réelle
+  // (ou fallback signalé) ; sert au signal « zone couverte ».
+  const cpm = c.cpmEur ?? CONFIG.cpmEur;
+  const capF = c.capFreq ?? CONFIG.capFrequenceMensuelle;
+  const impressions = cpm > 0 ? (budgetPub / cpm) * 1000 : 0;
+  const aud = c.audienceMeta && c.audienceMeta > 0 ? c.audienceMeta : 0;
+  const reach = aud > 0 && capF > 0 ? Math.min(aud, impressions / capF) : 0;
+  const frequence = reach > 0 ? Math.min(capF, impressions / reach) : 0;
+  const coverage = aud > 0 ? reach / aud : 0;
+  return { leads, budgetPub, rdv, presents, ventes, margeGen, coutParRdv, totalCost, roas, profit, util, effCpl, breakEven, impressions, reach, frequence, coverage };
 }
 
 function Slider({
@@ -164,12 +177,22 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   const [compLevel, setCompLevel] = useState<"faible" | "moyenne" | "forte">("moyenne");
   const [autoActive, setAutoActive] = useState(false);
 
+  // Ciblage par adresse + rayon (étape b : fallback « estimation » tant que les
+  // carreaux INSEE ne sont pas chargés — la vraie mesure PostGIS viendra ensuite).
+  const [addrQuery, setAddrQuery] = useState("");
+  const [addrSug, setAddrSug] = useState<GeoPoint[]>([]);
+  const [geoPoint, setGeoPoint] = useState<GeoPoint | null>(null);
+  const [communeInfo, setCommuneInfo] = useState<CommuneInfo | null>(null);
+  const [radiusKm, setRadiusKm] = useState(CONFIG.rayonDefautKm);
+  const [tranches, setTranches] = useState<Tranche[]>(METIER_TARGETING.audio.tranches);
+
   const V = METIERS[metier];
 
   const applyMetier = (m: Metier) => {
     const v = METIERS[m];
     setMetier(m);
     setPartC2(v.partPremium); setMargeC2(v.margePremium); setMargeC1(v.margeBase);
+    setTranches(METIER_TARGETING[m].tranches);
     setAutoActive(false);
   };
   const applyScenario = (k: ScenKey) => {
@@ -180,7 +203,20 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   const A = (setter: (n: number) => void) => (n: number) => { setter(n); setScenario(null); setAutoActive(false); };
 
   const blendedMarge = blend(partC2, margeC2, margeC1);
-  const ceiling = pop55 * 0.005;
+
+  // Audience géo (étape b) : population par tranche dans le rayon (fallback commune
+  // signalé « estimation »), puis audience Meta atteignable, puis plafond de leads.
+  const tauxInMarket = METIER_TARGETING[metier].tauxInMarketMensuel;
+  const geoActive = !!(geoPoint && communeInfo);
+  const popByAge: PopParTranche =
+    geoActive && communeInfo ? popFallbackParTranche(communeInfo.population, communeInfo.surfaceKm2, radiusKm) : {};
+  const popCible = tranches.reduce((s, t) => s + (popByAge[t] ?? 0), 0);
+  const audienceMeta = geoActive ? audienceMetaEstimee(popByAge, tranches) : 0;
+  // Plafond de captation mensuelle : dérivé de l'audience réelle si dispo, sinon
+  // ancien repli (slider pop55) tant qu'aucune adresse n'est géocodée.
+  const ceiling = geoActive
+    ? Math.max(1, audienceMeta * tauxInMarket * CONFIG.partLeadsViaFormulaire)
+    : pop55 * 0.005;
 
   // Zone géographique (depuis la ville sélectionnée)
   const scopedPop = city?.population ?? 0;
@@ -192,7 +228,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   const compMult = compLevel === "faible" ? 0.9 : compLevel === "forte" ? 1.25 : 1;
 
   // Lien vers la bibliothèque publicitaire Meta (pré-remplie)
-  const adKw = `${V.adKeyword} ${city?.nom || cityQuery.trim()}`.trim();
+  const adKw = `${V.adKeyword} ${geoPoint?.city || city?.nom || cityQuery.trim()}`.trim();
   const adLibUrl = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=FR&media_type=all&q=${encodeURIComponent(adKw)}&search_type=keyword_unordered`;
 
   // Autocomplétion ville via l'API publique geo.api.gouv.fr (gratuite, sans clé).
@@ -211,9 +247,28 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
     return () => clearTimeout(t);
   }, [cityQuery, city]);
 
+  // Autocomplétion ADRESSE via la BAN servie par l'IGN (data.geopf.fr).
+  useEffect(() => {
+    const q = addrQuery.trim();
+    if (q.length < 3 || (geoPoint && geoPoint.label === q)) { setAddrSug([]); return; }
+    const t = setTimeout(async () => setAddrSug(await suggestAdresses(q)), 250);
+    return () => clearTimeout(t);
+  }, [addrQuery, geoPoint]);
+
+  // Récupère population + surface de la commune du point géocodé (pour le fallback).
+  useEffect(() => {
+    if (!geoPoint?.citycode) { setCommuneInfo(null); return; }
+    let alive = true;
+    fetchCommune(geoPoint.citycode).then((c) => { if (alive) setCommuneInfo(c); });
+    return () => { alive = false; };
+  }, [geoPoint]);
+
   // Régime établi pour l'affichage principal ; la projection 12 mois modélise, elle,
   // les 2 premiers mois d'apprentissage (plus aucun toggle contradictoire).
-  const ctx: Ctx = { mode, targetRdv, budget, marge: blendedMarge, fee, ceiling, period: "regime", compMult };
+  const ctx: Ctx = {
+    mode, targetRdv, budget, marge: blendedMarge, fee, ceiling, period: "regime", compMult,
+    audienceMeta: geoActive ? audienceMeta : undefined, cpmEur: CONFIG.cpmEur, capFreq: CONFIG.capFrequenceMensuelle,
+  };
   const cur: Assum = { cpl, leadToRdv, presence, closing };
 
   // Mode auto : règle hypothèses pub + économie + concurrence au plus réaliste
@@ -503,10 +558,70 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
               </div>
             )}
 
+            {/* Ciblage par adresse + rayon → population réelle par âge dans la zone */}
             <div className="mt-4">
-              <Slider label={V.audienceLabel} value={pop55} set={setPop55} min={1500} max={200000} step={1000} />
-              <p className="mt-2 text-xs text-mut">Plafond estimé : ~<b className="text-ink">{num(ceiling)}</b> leads/mois avant saturation</p>
+              <p className="mb-1.5 text-sm font-medium text-ink">Adresse du centre</p>
+              <div className="relative">
+                <input value={addrQuery} onChange={(e) => { setAddrQuery(e.target.value); setGeoPoint(null); }}
+                  placeholder="N° et rue (ex. 12 av. de la Gare, La Rochelle)" aria-label="Adresse du centre"
+                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent" />
+                {addrSug.length > 0 && (
+                  <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-line bg-white shadow-card">
+                    {addrSug.map((g, i) => (
+                      <button key={i} onClick={() => { setGeoPoint(g); setAddrQuery(g.label); setAddrSug([]); }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-paper">
+                        <MapPin size={13} className="shrink-0 text-mut" />
+                        <span className="truncate">{g.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
+
+            <div className="mt-4">
+              <Slider label="Rayon ciblé autour du centre" value={radiusKm} set={setRadiusKm} min={CONFIG.rayonMinKm} max={CONFIG.rayonMaxKm} suffix=" km" />
+            </div>
+
+            <div className="mt-4">
+              <p className="text-sm font-medium text-ink">Tranches d'âge ciblées</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {TRANCHES.map((t) => {
+                  const on = tranches.includes(t.key);
+                  return (
+                    <button key={t.key} aria-pressed={on}
+                      onClick={() => setTranches(on ? tranches.filter((x) => x !== t.key) : [...tranches, t.key])}
+                      className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${on ? "border-accent bg-accent text-white" : "border-line text-mut hover:border-accent"}`}>
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {geoActive ? (
+              <div className="mt-4 space-y-1.5 rounded-xl border border-accent/30 bg-accent/5 p-3 text-xs">
+                <div className="flex items-center gap-1.5 font-semibold text-ink">
+                  <Users size={13} className="text-accent" /> Audience dans {num(radiusKm)} km
+                  <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">estimation</span>
+                </div>
+                <p className="text-mut">Population des tranches ciblées : <b className="text-ink">{num(popCible)}</b></p>
+                <p className="text-mut">Audience Meta atteignable : ~<b className="text-ink">{num(audienceMeta)}</b></p>
+                <p className="text-mut">Plafond réaliste : ~<b className="text-ink">{num(ceiling)}</b> leads/mois</p>
+                <p className="text-[10px] text-mut">Estimation : population commune × pyramide nationale (la vraie mesure carreau INSEE remplacera ce calcul).</p>
+              </div>
+            ) : (
+              <p className="mt-3 rounded-xl bg-paper p-3 text-[11px] text-mut">
+                Saisissez une <b className="text-ink">adresse</b> pour estimer l'audience réelle par rayon. À défaut, réglage manuel ci-dessous.
+              </p>
+            )}
+
+            {!geoActive && (
+              <div className="mt-4">
+                <Slider label={V.audienceLabel} value={pop55} set={setPop55} min={1500} max={200000} step={1000} />
+                <p className="mt-2 text-xs text-mut">Plafond estimé : ~<b className="text-ink">{num(ceiling)}</b> leads/mois avant saturation</p>
+              </div>
+            )}
 
             <div className="mt-4">
               <p className="text-sm font-medium text-ink">Intensité concurrentielle</p>
@@ -690,7 +805,15 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
             <div className="mt-4 flex flex-wrap gap-4 text-sm">
               <span className="text-mut">Coût par RDV : <b className="text-ink">{eur(r.coutParRdv)}</b></span>
               <span className="text-mut">CPL effectif : <b className="text-ink">{eur(r.effCpl)}</b></span>
+              {geoActive && (
+                <span className="text-mut">Couverture audience : <b className="text-ink">{num(r.coverage * 100)}%</b> · fréquence <b className="text-ink">×{num1(r.frequence)}</b></span>
+              )}
             </div>
+            {geoActive && r.coverage >= 0.99 && (
+              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-700">
+                Audience presque entièrement couverte dans ce rayon — augmenter le budget n'apporte plus de reach. Élargissez le rayon pour aller plus loin.
+              </p>
+            )}
           </div>
 
           {/* rentabilité */}
