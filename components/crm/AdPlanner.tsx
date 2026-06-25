@@ -3,9 +3,10 @@
 import { useState, useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Target, Wallet, ShieldCheck, Gauge, Rocket, AlertTriangle, CheckCircle2, MapPin, FileDown, TrendingUp, Sliders, Layers, Search, Sparkles, FileText, Users } from "lucide-react";
-import { CONFIG, METIER_TARGETING, TRANCHES, audienceMetaEstimee, type Metier, type Tranche, type PopParTranche } from "@/lib/adPlannerConfig";
+import { Target, Wallet, ShieldCheck, Gauge, Rocket, AlertTriangle, CheckCircle2, MapPin, FileDown, TrendingUp, Sliders, Layers, Search, Sparkles, FileText, Users, Wand2, Copy } from "lucide-react";
+import { CONFIG, METIER_TARGETING, TRANCHES, audienceMetaEstimee, makeTargetingSpec, type Metier, type Tranche, type PopParTranche } from "@/lib/adPlannerConfig";
 import { suggestAdresses, fetchCommune, popFallbackParTranche, type GeoPoint, type CommuneInfo } from "@/lib/geo";
+import { aiSuggestAdPlannerConfig, aiExplainAdPlannerPlan } from "@/app/crm/ai-actions";
 
 type Commune = { nom: string; codeDepartement: string; departement?: { nom: string; code: string }; population: number };
 
@@ -185,6 +186,13 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   const [communeInfo, setCommuneInfo] = useState<CommuneInfo | null>(null);
   const [radiusKm, setRadiusKm] = useState(CONFIG.rayonDefautKm);
   const [tranches, setTranches] = useState<Tranche[]>(METIER_TARGETING.audio.tranches);
+
+  // Couche IA Claude (étape e) : suggestion d'hypothèses + explication du plan.
+  const [aiBusy, setAiBusy] = useState<"suggest" | "explain" | null>(null);
+  const [aiNote, setAiNote] = useState("");   // justification de la dernière suggestion
+  const [aiPlan, setAiPlan] = useState("");   // texte d'explication du plan
+  const [aiErr, setAiErr] = useState("");
+  const [metaCopied, setMetaCopied] = useState(false);
 
   const V = METIERS[metier];
 
@@ -446,6 +454,79 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
     w.document.close();
   }
 
+  // ---- IA Claude : suggestion d'hypothèses (les chiffres de zone restent mesurés) ----
+  async function runSuggest() {
+    setAiErr(""); setAiBusy("suggest");
+    try {
+      const res = await aiSuggestAdPlannerConfig({
+        metier, metierLabel: V.label,
+        zone: {
+          ville: city?.nom || geoPoint?.city || cityQuery.trim() || undefined,
+          adresse: geoPoint?.label,
+          rayonKm: geoActive ? radiusKm : undefined,
+          populationCiblee: geoActive ? Math.round(popCible) : undefined,
+          audienceMeta: geoActive ? audienceMeta : undefined,
+          concurrents: estCompetitors || undefined,
+          intensiteConcurrence: compLevel,
+        },
+        actuel: { cpl, leadToRdv, presence, closing, fee },
+      });
+      if (!res.ok || !res.data) { setAiErr(res.error || "Suggestion indisponible."); return; }
+      const d = res.data;
+      setCpl(d.cpl); setLeadToRdv(d.leadToRdv); setPresence(d.presence); setClosing(d.closing);
+      setCompLevel(d.compLevel); setFee(d.fee);
+      setScenario(null); setAutoActive(false);
+      setAiNote(d.rationale);
+    } catch (e) {
+      setAiErr((e as Error).message);
+    } finally {
+      setAiBusy(null);
+    }
+  }
+
+  // ---- IA Claude : explication client du plan déjà chiffré (aucun recalcul) ----
+  async function runExplain() {
+    setAiErr(""); setAiBusy("explain");
+    try {
+      const res = await aiExplainAdPlannerPlan({
+        metierLabel: V.label, mode,
+        zone: city?.nom || geoPoint?.city || cityQuery.trim() || undefined,
+        rayonKm: geoActive ? radiusKm : undefined,
+        budgetPubMensuel: Math.round(r.budgetPub),
+        honoraires: fee,
+        leadsMois: Math.round(r.leads),
+        rdvMois: Math.round(r.rdv),
+        ventesMois: Math.round(r.ventes * 10) / 10,
+        margeGeneree: Math.round(r.margeGen),
+        margeNette: Math.round(r.profit),
+        retourParEuro: Math.round(r.roas * 10) / 10,
+        cplEffectif: Math.round(r.effCpl),
+        audienceMeta: geoActive ? audienceMeta : undefined,
+        couverturePct: geoActive ? Math.round(r.coverage * 100) : undefined,
+        paybackMois: paybackIdx >= 0 ? paybackIdx + 1 : null,
+      });
+      if (!res.ok || !res.text) { setAiErr(res.error || "Explication indisponible."); return; }
+      setAiPlan(res.text);
+    } catch (e) {
+      setAiErr((e as Error).message);
+    } finally {
+      setAiBusy(null);
+    }
+  }
+
+  // ---- Ciblage Meta déterministe (jamais généré par l'IA), copié au presse-papiers ----
+  async function copyMetaTargeting() {
+    if (!geoPoint) return;
+    const spec = makeTargetingSpec(geoPoint.lat, geoPoint.lon, radiusKm, metier);
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(spec, null, 2));
+      setMetaCopied(true);
+      setTimeout(() => setMetaCopied(false), 2000);
+    } catch {
+      setAiErr("Copie impossible (presse-papiers indisponible).");
+    }
+  }
+
   // ---- Mini graphe projection 12 mois (SVG) avec bande de confiance ----
   const CW = 560, CH = 150, PADL = 8, PADR = 8, PADT = 14, PADB = 18;
   const cvals = [0, ...cumProfit, ...cumLow, ...cumHigh];
@@ -517,6 +598,11 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${autoActive ? "border-accent bg-accent text-white" : "border-accent text-accent hover:bg-accent hover:text-white"}`}>
               <Sparkles size={14} /> Auto
             </button>
+            <button onClick={runSuggest} disabled={aiBusy !== null}
+              title="Faire proposer des hypothèses réalistes par l'IA (à partir des chiffres de zone mesurés)"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#0a1430] bg-[#0a1430] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-50">
+              <Wand2 size={14} /> {aiBusy === "suggest" ? "Analyse…" : "Suggérer (IA)"}
+            </button>
             <span className="mx-0.5 hidden h-4 w-px bg-line sm:block" />
             {(Object.keys(SCENARIOS) as ScenKey[]).map((k) => (
               <button key={k} onClick={() => applyScenario(k)}
@@ -526,6 +612,12 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
             ))}
           </div>
         </div>
+        {aiNote && (
+          <p className="mt-3 flex items-start gap-2 rounded-xl border border-[#0a1430]/15 bg-[#0a1430]/5 p-3 text-xs leading-relaxed text-ink">
+            <Wand2 size={14} className="mt-0.5 shrink-0 text-accent" /> <span><b>Hypothèses IA appliquées —</b> {aiNote}</span>
+          </p>
+        )}
+        {aiErr && <p className="mt-3 rounded-xl bg-red-50 p-3 text-xs font-medium text-red-700">{aiErr}</p>}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[330px_minmax(0,1fr)]">
@@ -906,6 +998,30 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
             >
               <FileText size={16} /> Créer un devis depuis ces chiffres
             </Link>
+
+            {/* Couche IA Claude : explication client + ciblage Meta déterministe */}
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-4">
+              <button onClick={runExplain} disabled={aiBusy !== null}
+                className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-50">
+                <Sparkles size={16} /> {aiBusy === "explain" ? "Rédaction…" : "Expliquer le plan (IA)"}
+              </button>
+              <button onClick={copyMetaTargeting} disabled={!geoActive}
+                title={geoActive ? "Copier le ciblage Meta (adresse + rayon + âge) au format API" : "Saisissez une adresse pour générer le ciblage"}
+                className="inline-flex items-center gap-2 rounded-xl border border-white/20 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-40">
+                <Copy size={16} /> {metaCopied ? "Ciblage copié ✓" : "Copier le ciblage Meta"}
+              </button>
+            </div>
+            {aiPlan && (
+              <div className="mt-3 rounded-xl bg-white/10 p-4 text-[13px] leading-relaxed text-white/90">
+                <p className="whitespace-pre-line">{aiPlan}</p>
+                <button onClick={() => navigator.clipboard?.writeText(aiPlan)}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-white hover:bg-white/10">
+                  <Copy size={12} /> Copier le texte
+                </button>
+                <p className="mt-2 text-[10px] text-[#9CC2FF]">Brouillon IA — relisez-le : il n'utilise que les chiffres du simulateur, jamais de données inventées.</p>
+              </div>
+            )}
+            {aiErr && <p className="mt-3 rounded-xl bg-red-500/20 p-3 text-xs font-medium text-red-200">{aiErr}</p>}
           </div>
 
           <p className="text-xs text-mut">

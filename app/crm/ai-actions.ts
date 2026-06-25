@@ -4,6 +4,14 @@ import { revalidatePath } from "next/cache";
 import { isAuthed } from "@/lib/auth";
 import { getDb } from "@/lib/supabaseAdmin";
 import { aiEnabled, transcribeAudio, summarizeCall } from "@/lib/ai";
+import {
+  adPlannerAiEnabled,
+  suggestConfig,
+  explainPlan,
+  type AdPlannerSuggestInput,
+  type AdPlannerSuggestion,
+  type AdPlannerPlanInput,
+} from "@/lib/aiAdPlanner";
 
 // Transcrit + résume un appel enregistré, puis ajoute le résumé aux notes de l'appel.
 export async function summarizeRecording(callId: string): Promise<{ ok: boolean; summary?: string; error?: string }> {
@@ -29,6 +37,34 @@ export async function summarizeRecording(callId: string): Promise<{ ok: boolean;
     if (error) return { ok: false, error: error.message };
     if (call.prospect_id) revalidatePath(`/crm/prospect/${call.prospect_id}`);
     return { ok: true, summary };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+// --- Ad Planner : couche IA Claude (étape e) ---
+// L'IA propose des hypothèses de campagne / explique un plan ; elle n'invente
+// jamais de population ou d'audience (cf. garde-fous dans lib/aiAdPlanner.ts).
+
+export async function aiSuggestAdPlannerConfig(
+  input: AdPlannerSuggestInput
+): Promise<{ ok: boolean; data?: AdPlannerSuggestion; error?: string }> {
+  if (!isAuthed()) return { ok: false, error: "Non autorisé" };
+  if (!adPlannerAiEnabled()) return { ok: false, error: "IA non configurée (ANTHROPIC_API_KEY absent)." };
+  try {
+    return { ok: true, data: await suggestConfig(input) };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+export async function aiExplainAdPlannerPlan(
+  input: AdPlannerPlanInput
+): Promise<{ ok: boolean; text?: string; error?: string }> {
+  if (!isAuthed()) return { ok: false, error: "Non autorisé" };
+  if (!adPlannerAiEnabled()) return { ok: false, error: "IA non configurée (ANTHROPIC_API_KEY absent)." };
+  try {
+    return { ok: true, text: await explainPlan(input) };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
