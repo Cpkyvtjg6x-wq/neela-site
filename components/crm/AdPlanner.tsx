@@ -7,6 +7,8 @@ import { Target, Wallet, ShieldCheck, Gauge, Rocket, AlertTriangle, CheckCircle2
 import { CONFIG, METIER_TARGETING, TRANCHES, audienceMetaEstimee, makeTargetingSpec, type Metier, type Tranche, type PopParTranche } from "@/lib/adPlannerConfig";
 import { suggestAdresses, fetchCommune, popFallbackParTranche, type GeoPoint, type CommuneInfo } from "@/lib/geo";
 import { aiSuggestAdPlannerConfig, aiExplainAdPlannerPlan } from "@/app/crm/ai-actions";
+import { mesurerPopulation } from "@/app/crm/adplanner-actions";
+import type { PopMesure } from "@/lib/inseeCarreaux";
 
 type Commune = { nom: string; codeDepartement: string; departement?: { nom: string; code: string }; population: number };
 
@@ -194,6 +196,10 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   const [aiErr, setAiErr] = useState("");
   const [metaCopied, setMetaCopied] = useState(false);
 
+  // Mesure RÉELLE par rayon (carreaux INSEE 200 m via WFS, étape c) ; null = repli estimation.
+  const [realPop, setRealPop] = useState<PopMesure | null>(null);
+  const [measuring, setMeasuring] = useState(false);
+
   const V = METIERS[metier];
 
   const applyMetier = (m: Metier) => {
@@ -212,12 +218,17 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
 
   const blendedMarge = blend(partC2, margeC2, margeC1);
 
-  // Audience géo (étape b) : population par tranche dans le rayon (fallback commune
-  // signalé « estimation »), puis audience Meta atteignable, puis plafond de leads.
+  // Audience géo : population par tranche dans le rayon. Priorité à la MESURE RÉELLE
+  // (carreaux INSEE 200 m, étape c) ; repli « estimation commune » (étape b) si la
+  // mesure n'est pas encore là / a échoué. Puis audience Meta atteignable → plafond.
   const tauxInMarket = METIER_TARGETING[metier].tauxInMarketMensuel;
-  const geoActive = !!(geoPoint && communeInfo);
-  const popByAge: PopParTranche =
-    geoActive && communeInfo ? popFallbackParTranche(communeInfo.population, communeInfo.surfaceKm2, radiusKm) : {};
+  const usingReal = !!realPop;
+  const geoActive = !!(geoPoint && (communeInfo || realPop));
+  const popByAge: PopParTranche = realPop
+    ? realPop.popParTranche
+    : geoActive && communeInfo
+    ? popFallbackParTranche(communeInfo.population, communeInfo.surfaceKm2, radiusKm)
+    : {};
   const popCible = tranches.reduce((s, t) => s + (popByAge[t] ?? 0), 0);
   const audienceMeta = geoActive ? audienceMetaEstimee(popByAge, tranches) : 0;
   // Plafond de captation mensuelle : dérivé de l'audience réelle si dispo, sinon
@@ -270,6 +281,21 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
     fetchCommune(geoPoint.citycode).then((c) => { if (alive) setCommuneInfo(c); });
     return () => { alive = false; };
   }, [geoPoint]);
+
+  // Mesure RÉELLE par rayon (carreaux INSEE 200 m) via server action, débouncée sur
+  // (point, rayon). En cas d'échec/indispo : realPop=null → repli estimation commune.
+  useEffect(() => {
+    if (!geoPoint) { setRealPop(null); setMeasuring(false); return; }
+    let alive = true;
+    setMeasuring(true);
+    const t = setTimeout(async () => {
+      const res = await mesurerPopulation(geoPoint.lat, geoPoint.lon, radiusKm);
+      if (!alive) return;
+      setRealPop(res.ok && res.data ? res.data : null);
+      setMeasuring(false);
+    }, 450);
+    return () => { alive = false; clearTimeout(t); };
+  }, [geoPoint, radiusKm]);
 
   // Régime établi pour l'affichage principal ; la projection 12 mois modélise, elle,
   // les 2 premiers mois d'apprentissage (plus aucun toggle contradictoire).
@@ -695,12 +721,24 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
               <div className="mt-4 space-y-1.5 rounded-xl border border-accent/30 bg-accent/5 p-3 text-xs">
                 <div className="flex items-center gap-1.5 font-semibold text-ink">
                   <Users size={13} className="text-accent" /> Audience dans {num(radiusKm)} km
-                  <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">estimation</span>
+                  {measuring ? (
+                    <span className="ml-1 rounded-full bg-line/60 px-1.5 py-0.5 text-[10px] font-semibold text-mut">mesure…</span>
+                  ) : usingReal ? (
+                    <span className="ml-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">mesure INSEE</span>
+                  ) : (
+                    <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">estimation</span>
+                  )}
                 </div>
                 <p className="text-mut">Population des tranches ciblées : <b className="text-ink">{num(popCible)}</b></p>
                 <p className="text-mut">Audience Meta atteignable : ~<b className="text-ink">{num(audienceMeta)}</b></p>
                 <p className="text-mut">Plafond réaliste : ~<b className="text-ink">{num(ceiling)}</b> leads/mois</p>
-                <p className="text-[10px] text-mut">Estimation : population commune × pyramide nationale (la vraie mesure carreau INSEE remplacera ce calcul).</p>
+                {usingReal && realPop ? (
+                  <p className="text-[10px] text-mut">
+                    Mesure réelle : <b className="text-ink">{num(realPop.nbCarreaux)}</b> carreaux INSEE 200 m sur <b className="text-ink">{num(realPop.nbCommunes)}</b> commune{realPop.nbCommunes > 1 ? "s" : ""}{realPop.approx ? " (zone très large : sous-estimation possible)" : ""}.
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-mut">Estimation : population commune × pyramide nationale (mesure carreau INSEE indisponible pour l'instant).</p>
+                )}
               </div>
             ) : (
               <p className="mt-3 rounded-xl bg-paper p-3 text-[11px] text-mut">
