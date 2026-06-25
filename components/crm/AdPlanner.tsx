@@ -10,6 +10,13 @@ type Commune = { nom: string; codeDepartement: string; departement?: { nom: stri
 const eur = (n: number) => Math.round(n).toLocaleString("fr-FR") + " €";
 const num = (n: number) => Math.round(n).toLocaleString("fr-FR");
 const num1 = (n: number) => (Math.round(n * 10) / 10).toLocaleString("fr-FR");
+const r10 = (n: number) => Math.round(n / 10) * 10;
+
+// Marge mixte (premium / base) et honoraires recommandés — factorisés (utilisés
+// à la fois pour l'affichage, le mode Auto et la reco d'honoraires).
+const blend = (partPrem: number, margePrem: number, margeBase: number) =>
+  (partPrem / 100) * margePrem + (1 - partPrem / 100) * margeBase;
+const recoFee = (marge: number) => r10(Math.min(2500, Math.max(600, 0.25 * marge)));
 
 type ScenKey = "prudent" | "realiste" | "optimiste";
 const SCENARIOS: Record<ScenKey, { cpl: number; leadToRdv: number; presence: number; closing: number; label: string }> = {
@@ -18,7 +25,7 @@ const SCENARIOS: Record<ScenKey, { cpl: number; leadToRdv: number; presence: num
   optimiste: { cpl: 10, leadToRdv: 45, presence: 80, closing: 33, label: "Optimiste" },
 };
 
-// Presets par métier : seulement l'économie + le vocabulaire changent
+// Presets par métier : l'économie + le vocabulaire changent
 // (les hypothèses pub restent pilotées par les scénarios, universelles).
 type Metier = "audio" | "optique" | "dentaire";
 type Vocab = {
@@ -71,7 +78,9 @@ type Ctx = {
   compMult: number;
 };
 
-const satMult = (u: number) => (u <= 1 ? 1 : 1 + (u - 1) * 0.6);
+// Saturation de zone : au-delà du plafond de leads, le CPL grimpe — PLAFONNÉ à ×2,5
+// (au-delà, Meta ne trouve tout simplement plus l'audience : on borne le réalisme).
+const satMult = (u: number) => (u <= 1 ? 1 : Math.min(2.5, 1 + (u - 1) * 0.6));
 
 function compute(a: Assum, c: Ctx) {
   const cplMult = (c.period === "apprentissage" ? 1.35 : 1) * c.compMult;
@@ -89,7 +98,7 @@ function compute(a: Assum, c: Ctx) {
   } else {
     budgetPub = c.budget;
     effCpl = a.cpl * cplMult;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       const lds = budgetPub / effCpl;
       const util = c.ceiling > 0 ? lds / c.ceiling : 0;
       effCpl = a.cpl * cplMult * satMult(util);
@@ -118,8 +127,12 @@ function Slider({
         <span className="text-sm font-medium text-ink">{label}</span>
         <span className="font-display text-sm font-bold text-accent">{value.toLocaleString("fr-FR")}{suffix}</span>
       </div>
-      <input type="range" min={min} max={max} step={step} value={value}
-        onChange={(e) => set(Number(e.target.value))} className="mt-2 w-full accent-accent" />
+      <input
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={(e) => set(Number(e.target.value))}
+        aria-label={label}
+        className="mt-2 w-full cursor-pointer accent-accent"
+      />
     </div>
   );
 }
@@ -129,7 +142,6 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   const [mode, setMode] = useState<"objectif" | "budget">("objectif");
   const [targetRdv, setTargetRdv] = useState(20);
   const [budget, setBudget] = useState(1000);
-  const [period, setPeriod] = useState<"apprentissage" | "regime">("regime");
 
   const [metier, setMetier] = useState<Metier>("audio");
   const [scenario, setScenario] = useState<ScenKey | null>("realiste");
@@ -167,7 +179,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   };
   const A = (setter: (n: number) => void) => (n: number) => { setter(n); setScenario(null); setAutoActive(false); };
 
-  const blendedMarge = (partC2 / 100) * margeC2 + (1 - partC2 / 100) * margeC1;
+  const blendedMarge = blend(partC2, margeC2, margeC1);
   const ceiling = pop55 * 0.005;
 
   // Zone géographique (depuis la ville sélectionnée)
@@ -199,7 +211,9 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
     return () => clearTimeout(t);
   }, [cityQuery, city]);
 
-  const ctx: Ctx = { mode, targetRdv, budget, marge: blendedMarge, fee, ceiling, period, compMult };
+  // Régime établi pour l'affichage principal ; la projection 12 mois modélise, elle,
+  // les 2 premiers mois d'apprentissage (plus aucun toggle contradictoire).
+  const ctx: Ctx = { mode, targetRdv, budget, marge: blendedMarge, fee, ceiling, period: "regime", compMult };
   const cur: Assum = { cpl, leadToRdv, presence, closing };
 
   // Mode auto : règle hypothèses pub + économie + concurrence au plus réaliste
@@ -216,25 +230,26 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
     const newCpl = Math.round(v.adCpl * cplAdj);
     const newPop = city && estPop ? Math.min(200000, Math.max(1500, Math.round(estPop / 1000) * 1000)) : pop55;
     const compM = level === "faible" ? 0.9 : level === "forte" ? 1.25 : 1;
-    const newMarge = (v.partPremium / 100) * v.margePremium + (1 - v.partPremium / 100) * v.margeBase;
+    const newMarge = blend(v.partPremium, v.margePremium, v.margeBase);
     const tmp = compute(
       { cpl: newCpl, leadToRdv: v.adLeadToRdv, presence: v.adPresence, closing: v.adClosing },
       { ...ctx, marge: newMarge, ceiling: newPop * 0.005, compMult: compM }
     );
-    const newFee = Math.round(Math.min(2500, Math.max(600, 0.25 * tmp.margeGen)) / 10) * 10;
 
     setCpl(newCpl); setLeadToRdv(v.adLeadToRdv); setPresence(v.adPresence); setClosing(v.adClosing);
     setPartC2(v.partPremium); setMargeC2(v.margePremium); setMargeC1(v.margeBase);
-    setPop55(newPop); setCompLevel(level); setFee(newFee);
+    setPop55(newPop); setCompLevel(level); setFee(recoFee(tmp.margeGen));
     setScenario(null); setAutoActive(true);
   }
 
   const r = compute(cur, ctx);
   const rP = compute(SCENARIOS.prudent, ctx);
   const rO = compute(SCENARIOS.optimiste, ctx);
+  // La fourchette englobe TOUJOURS la valeur affichée (le réglage courant peut
+  // sortir de prudent↔optimiste, ex. en mode Auto).
   const band = (sel: (x: ReturnType<typeof compute>) => number) => {
-    const a = sel(rP), b = sel(rO);
-    return [Math.min(a, b), Math.max(a, b)] as const;
+    const vals = [sel(rP), sel(rO), sel(r)];
+    return [Math.min(...vals), Math.max(...vals)] as const;
   };
 
   // ---- Projection 12 mois (budget mensuel constant = budget de régime) ----
@@ -278,12 +293,14 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
     : r.leads >= 15
     ? { c: "amber", t: "Budget un peu juste", d: "Sortie de phase d'apprentissage lente, résultats instables au début." }
     : { c: "red", t: "Budget trop faible", d: "Pas assez de signal : Meta n'optimise pas, rendement aléatoire." };
-  const minBudget = 30 * cpl;
+  // Budget minimum réaliste : 30 leads au CPL EFFECTIF (concurrence incluse, régime).
+  const minBudget = 30 * cpl * compMult;
 
-  // Honoraires recommandés (rester concurrentiel) : ~25 % de la marge générée, bornés.
-  const feeReco = Math.round(Math.min(2500, Math.max(600, 0.25 * r.margeGen)) / 10) * 10;
-  const feeLow = Math.round(Math.max(500, 0.18 * r.margeGen) / 10) * 10;
-  const feeHigh = Math.round(Math.min(3000, 0.3 * r.margeGen) / 10) * 10;
+  // Honoraires recommandés (rester concurrentiel) : ~25 % de la marge générée, bornés,
+  // et garantis ordonnés (bas ≤ recommandé ≤ haut).
+  const feeReco = recoFee(r.margeGen);
+  const feeLow = Math.min(feeReco, r10(Math.max(500, 0.18 * r.margeGen)));
+  const feeHigh = Math.max(feeReco, r10(Math.min(3000, 0.3 * r.margeGen)));
 
   const zone = r.util <= 0.7
     ? { c: "emerald", t: "Zone confortable" }
@@ -299,6 +316,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
     { l: cap(V.ventes), v: r.ventes },
   ];
   const fmax = Math.max(1, r.leads);
+  const margeOk = blendedMarge > 0;
   const card = "rounded-2xl border border-line bg-white p-5";
   const scenIcons: Record<ScenKey, ReactNode> = {
     prudent: <ShieldCheck size={15} />, realiste: <Gauge size={15} />, optimiste: <Rocket size={15} />,
@@ -328,7 +346,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   .kpi .v{font-size:26px;font-weight:800;letter-spacing:-.02em}
   .kpi .l{color:#6B7280;font-size:12px;margin-top:4px}
   .accent{color:#2563EB}.green{color:#059669}
-  .panel{background:#081434;color:#fff;border-radius:18px;padding:24px;margin:24px 0;line-height:1.6;font-size:15px}
+  .panel{background:#0a1430;color:#fff;border-radius:18px;padding:24px;margin:24px 0;line-height:1.6;font-size:15px}
   .panel b{color:#9CC2FF}
   table{width:100%;border-collapse:collapse;margin:8px 0 0}
   td{padding:9px 0;border-bottom:1px solid rgba(10,10,10,.08);font-size:14px}
@@ -343,14 +361,14 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   <div class="grid">
     <div class="kpi"><div class="v accent">${eur(r.budgetPub)}</div><div class="l">Budget pub / mois (versé à Meta)</div></div>
     <div class="kpi"><div class="v">${num(r.rdv)}</div><div class="l">${cap(V.objectif.split(" ")[0])} estimés / mois</div></div>
-    <div class="kpi"><div class="v green">×${num1(r.roas)}</div><div class="l">Retour par € investi</div></div>
+    <div class="kpi"><div class="v green">×${num1(r.roas)}</div><div class="l">Marge par € investi</div></div>
   </div>
 
   <table>
     <tr><td>Honoraires Neela / mois</td><td>${eur(fee)}</td></tr>
     <tr><td>${cap(V.ventes)} attendus / mois</td><td>${num1(r.ventes)}</td></tr>
     <tr><td>Marge générée / mois</td><td>${eur(r.margeGen)}</td></tr>
-    <tr><td>Rentable dès</td><td>${Math.ceil(r.breakEven)} ${V.ventes}</td></tr>
+    ${margeOk ? `<tr><td>Rentable dès</td><td>${Math.ceil(r.breakEven)} ${V.ventes}</td></tr>` : ""}
     <tr><td>Investissement récupéré</td><td>${paybackIdx >= 0 ? "mois " + (paybackIdx + 1) : "au-delà de 12 mois"}</td></tr>
     <tr><td>Profit net cumulé à 12 mois</td><td>${eur(cum12)}</td></tr>
   </table>
@@ -368,7 +386,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   <script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script>
 </body></html>`;
     const w = window.open("", "_blank", "width=840,height=1000");
-    if (!w) { alert("Autorise les fenêtres pop-up pour exporter la proposition."); return; }
+    if (!w) { alert("Autorisez les fenêtres pop-up pour exporter la proposition."); return; }
     w.document.write(html);
     w.document.close();
   }
@@ -390,40 +408,43 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
   const oY = (p: number) => OPT + (1 - (p - oMin) / ((oMax - oMin) || 1)) * (OH - OPT - OPB);
   const oPath = sweep.map((s, i) => `${i ? "L" : "M"} ${oX(s.b).toFixed(1)} ${oY(s.p).toFixed(1)}`).join(" ");
 
+  const seg = "inline-flex rounded-full border border-line bg-white p-1";
+  const segBtn = (on: boolean) =>
+    `rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${on ? "bg-accent text-white shadow-sm" : "text-mut hover:text-ink"}`;
+
   return (
     <div>
+      {/* En-tête */}
       <div className="mb-6">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent">Simulateur de chiffrage</p>
         <h1 className="font-display text-2xl font-bold tracking-tight">Ad Planner</h1>
-        <p className="mt-1 text-sm text-mut">Simule le budget Meta Ads, la rentabilité et le bon compromis pour chaque centre.</p>
+        <p className="mt-1 text-sm text-mut">Estimez le budget Meta Ads, la rentabilité et le bon compromis pour chaque centre.</p>
       </div>
 
-      {/* Métier + Mode + période */}
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <div className="inline-flex rounded-full border border-line bg-white p-1">
-          {(Object.keys(METIERS) as Metier[]).map((m) => (
-            <button key={m} onClick={() => applyMetier(m)}
-              className={`rounded-full px-3.5 py-2 text-sm font-semibold ${metier === m ? "bg-accent text-white" : "text-mut hover:text-ink"}`}>
-              {METIERS[m].label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <div className="inline-flex rounded-full border border-line bg-white p-1">
-          <button onClick={() => setMode("objectif")}
-            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ${mode === "objectif" ? "bg-ink text-paper" : "text-mut"}`}>
-            <Target size={16} /> Partir d'un objectif
-          </button>
-          <button onClick={() => setMode("budget")}
-            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ${mode === "budget" ? "bg-ink text-paper" : "text-mut"}`}>
-            <Wallet size={16} /> Partir d'un budget
-          </button>
-        </div>
-        <div className="inline-flex rounded-full border border-line bg-white p-1">
-          <button onClick={() => setPeriod("regime")}
-            className={`rounded-full px-4 py-2 text-sm font-semibold ${period === "regime" ? "bg-ink text-paper" : "text-mut"}`}>Régime établi</button>
-          <button onClick={() => setPeriod("apprentissage")}
-            className={`rounded-full px-4 py-2 text-sm font-semibold ${period === "apprentissage" ? "bg-ink text-paper" : "text-mut"}`}>Mois 1-2 (apprentissage)</button>
+      {/* Barre de contrôle : métier + point de départ */}
+      <div className="mb-5 rounded-2xl border border-line bg-white p-4">
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-mut">Métier</p>
+            <div className={seg}>
+              {(Object.keys(METIERS) as Metier[]).map((m) => (
+                <button key={m} onClick={() => applyMetier(m)} className={segBtn(metier === m)}>
+                  {METIERS[m].label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-mut">Point de départ</p>
+            <div className={seg}>
+              <button onClick={() => setMode("objectif")} className={`inline-flex items-center gap-2 ${segBtn(mode === "objectif")}`}>
+                <Target size={16} /> Un objectif
+              </button>
+              <button onClick={() => setMode("budget")} className={`inline-flex items-center gap-2 ${segBtn(mode === "budget")}`}>
+                <Wallet size={16} /> Un budget
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -433,18 +454,18 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
           <div>
             <p className="text-sm font-semibold text-ink">Scénario d'hypothèses</p>
             <p className="text-xs text-mut">
-              {autoActive ? "Réglage automatique optimisé (zone + métier)" : scenario ? `Réglage « ${SCENARIOS[scenario].label} »` : "Réglage personnalisé"} — montre le bas de la fourchette au client, jamais le haut.
+              {autoActive ? "Réglage automatique optimisé (zone + métier)" : scenario ? `Réglage « ${SCENARIOS[scenario].label} »` : "Réglage personnalisé"} — présentez le bas de la fourchette au client, jamais le haut.
             </p>
           </div>
           <div className="inline-flex flex-wrap items-center gap-2">
             <button onClick={autoOptimize} title="Régler automatiquement selon le métier et la zone sélectionnée"
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${autoActive ? "border-accent bg-accent text-white" : "border-accent text-accent hover:bg-accent hover:text-white"}`}>
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${autoActive ? "border-accent bg-accent text-white" : "border-accent text-accent hover:bg-accent hover:text-white"}`}>
               <Sparkles size={14} /> Auto
             </button>
             <span className="mx-0.5 hidden h-4 w-px bg-line sm:block" />
             {(Object.keys(SCENARIOS) as ScenKey[]).map((k) => (
               <button key={k} onClick={() => applyScenario(k)}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${scenario === k ? "border-accent bg-accent text-white" : "border-line text-mut hover:border-accent"}`}>
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${scenario === k ? "border-accent bg-accent text-white" : "border-line text-mut hover:border-accent"}`}>
                 {scenIcons[k]} {SCENARIOS[k].label}
               </button>
             ))}
@@ -460,7 +481,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
 
             <div className="relative">
               <input value={cityQuery} onChange={(e) => { setCityQuery(e.target.value); setCity(null); }}
-                placeholder="Ville du centre (ex. La Rochelle)"
+                placeholder="Ville du centre (ex. La Rochelle)" aria-label="Ville du centre"
                 className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent" />
               {citySug.length > 0 && (
                 <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-line bg-white shadow-card">
@@ -478,7 +499,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
             {city && (
               <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-paper p-3 text-xs text-mut">
                 <span><b className="text-ink">{city.nom}</b>{city.departement ? ` · ${city.departement.nom}` : ""} · <b className="text-ink">{num(scopedPop)}</b> hab. · cible <b className="text-ink">{num(estPop)}</b> · ~<b className="text-ink">{estCompetitors}</b> concurrents</span>
-                <button onClick={applyZone} className="ml-auto rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-white hover:opacity-90">Appliquer</button>
+                <button onClick={applyZone} className="ml-auto rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-white hover:opacity-90">Appliquer à la zone</button>
               </div>
             )}
 
@@ -492,7 +513,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
               <div className="mt-2 flex gap-2">
                 {(["faible", "moyenne", "forte"] as const).map((l) => (
                   <button key={l} onClick={() => setCompLevel(l)}
-                    className={`flex-1 rounded-full border px-2 py-1.5 text-xs font-semibold capitalize ${compLevel === l ? "border-accent bg-accent text-white" : "border-line text-mut hover:border-accent"}`}>
+                    className={`flex-1 rounded-full border px-2 py-1.5 text-xs font-semibold capitalize transition-colors ${compLevel === l ? "border-accent bg-accent text-white" : "border-line text-mut hover:border-accent"}`}>
                     {l}
                   </button>
                 ))}
@@ -510,7 +531,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
           </div>
 
           <div className={card}>
-            <h2 className="mb-4 font-display text-base font-bold">{mode === "objectif" ? "Ton objectif" : "Le budget pub"}</h2>
+            <h2 className="mb-4 font-display text-base font-bold">{mode === "objectif" ? "Votre objectif" : "Le budget pub"}</h2>
             {mode === "objectif"
               ? <Slider label={V.objectif} value={targetRdv} set={setTargetRdv} min={5} max={60} />
               : <Slider label="Budget pub mensuel (versé à Meta)" value={budget} set={setBudget} min={300} max={5000} step={50} suffix=" €" />}
@@ -533,11 +554,11 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
               <Slider label={V.premiumLabel} value={partC2} set={setPartC2} min={0} max={100} suffix=" %" />
               <Slider label={V.margePremiumLabel} value={margeC2} set={setMargeC2} min={50} max={3000} step={50} suffix=" €" />
               <Slider label={V.margeBaseLabel} value={margeC1} set={setMargeC1} min={0} max={1000} step={25} suffix=" €" />
-              <Slider label="Tes honoraires / mois" value={fee} set={setFee} min={300} max={3000} step={10} suffix=" €" />
+              <Slider label="Vos honoraires / mois" value={fee} set={setFee} min={300} max={3000} step={10} suffix=" €" />
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-accent/30 bg-accent/5 p-3 text-xs">
               <span className="text-mut">Honoraires recommandés pour rester concurrentiel : <b className="text-ink">{eur(feeReco)}</b> · fourchette {eur(feeLow)}–{eur(feeHigh)}</span>
-              <button onClick={() => setFee(feeReco)} className="ml-auto rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-white hover:opacity-90">Appliquer</button>
+              <button onClick={() => setFee(feeReco)} className="ml-auto rounded-full border border-accent px-2.5 py-1 text-[11px] font-semibold text-accent hover:bg-accent hover:text-white">Appliquer aux honoraires</button>
             </div>
           </div>
         </div>
@@ -554,21 +575,21 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
           </div>
 
           {/* KPI + fourchette */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {(() => {
               const cards = mode === "objectif"
                 ? [
                     { lab: "Budget pub / mois", main: eur(r.budgetPub), b: band((x) => x.budgetPub).map(eur), cls: "text-accent" },
                     { lab: "Marge générée (client)", main: eur(r.margeGen), b: band((x) => x.margeGen).map(eur), cls: "" },
-                    { lab: "Retour / € investi", main: "×" + num1(r.roas), b: band((x) => x.roas).map((v) => "×" + num1(v)), cls: "text-emerald-600" },
+                    { lab: "Marge par € investi", main: "×" + num1(r.roas), b: band((x) => x.roas).map((v) => "×" + num1(v)), cls: "text-emerald-600" },
                   ]
                 : [
                     { lab: "RDV attendus / mois", main: num(r.rdv), b: band((x) => x.rdv).map(num), cls: "text-accent" },
                     { lab: "Marge générée (client)", main: eur(r.margeGen), b: band((x) => x.margeGen).map(eur), cls: "" },
-                    { lab: "Retour / € investi", main: "×" + num1(r.roas), b: band((x) => x.roas).map((v) => "×" + num1(v)), cls: "text-emerald-600" },
+                    { lab: "Marge par € investi", main: "×" + num1(r.roas), b: band((x) => x.roas).map((v) => "×" + num1(v)), cls: "text-emerald-600" },
                   ];
               return cards.map((c) => (
-                <div key={c.lab} className="rounded-2xl border border-line bg-white p-4">
+                <div key={c.lab} className="rounded-2xl border border-line bg-white p-4 shadow-card">
                   <p className={`font-display text-2xl font-bold ${c.cls}`}>{c.main}</p>
                   <p className="mt-1 text-[11px] font-medium text-mut">{c.lab}</p>
                   <p className="mt-1 text-[10px] text-mut">fourchette : {c.b[0]} – {c.b[1]}</p>
@@ -631,7 +652,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
           <div className={card}>
             <h2 className="mb-1 flex items-center gap-2 font-display text-base font-bold"><Layers size={16} className="text-accent" /> 3 formules à proposer</h2>
             <p className="mb-4 text-xs text-mut">Même accompagnement, plus de budget = plus de résultats. Le palier du milieu est recommandé.</p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {tiers.map((t) => (
                 <div key={t.name} className={`rounded-2xl border p-4 ${t.reco ? "border-accent bg-accent/5" : "border-line"}`}>
                   {t.reco && <span className="mb-2 inline-block rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-white">Recommandé</span>}
@@ -658,7 +679,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
             <div className="space-y-3">
               {funnel.map((f) => (
                 <div key={f.l} className="flex items-center gap-3">
-                  <span className="w-28 shrink-0 text-sm text-mut">{f.l}</span>
+                  <span className="w-24 shrink-0 text-sm text-mut sm:w-28">{f.l}</span>
                   <div className="h-6 flex-1 overflow-hidden rounded-lg bg-paper">
                     <div className="flex h-full items-center justify-end rounded-lg bg-gradient-to-r from-accent to-[#5AA0FF] pr-2 text-[11px] font-bold text-white"
                       style={{ width: `${Math.max(6, (f.v / fmax) * 100)}%` }}>{num(f.v)}</div>
@@ -677,7 +698,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
             <h2 className="mb-3 font-display text-base font-bold">Seuil de rentabilité</h2>
             <div className="grid grid-cols-3 gap-3 text-center">
               <div className="rounded-xl bg-paper p-3">
-                <p className="font-display text-xl font-bold">{Math.ceil(r.breakEven)}</p>
+                <p className="font-display text-xl font-bold">{margeOk ? Math.ceil(r.breakEven) : "—"}</p>
                 <p className="text-[11px] text-mut">ventes pour rentabiliser</p>
               </div>
               <div className="rounded-xl bg-paper p-3">
@@ -690,7 +711,9 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
               </div>
             </div>
             <p className="mt-3 text-xs text-mut">
-              {r.ventes >= r.breakEven
+              {!margeOk
+                ? "Renseignez une marge (premium ou base) pour calculer le seuil de rentabilité."
+                : r.ventes >= r.breakEven
                 ? `Rentable dès la ${Math.ceil(r.breakEven)}ᵉ vente — l'objectif (~${num1(r.ventes)}) la dépasse.`
                 : `Attention : à ces hypothèses, l'objectif (~${num1(r.ventes)} ventes) ne couvre pas encore le coût (seuil ${Math.ceil(r.breakEven)}).`}
             </p>
@@ -720,18 +743,19 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
           </div>
 
           {/* à présenter + export */}
-          <div className="rounded-2xl border border-line bg-[#081434] p-5 text-white">
+          <div className="rounded-2xl border border-line bg-[#0a1430] p-5 text-white">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9CC2FF]">À présenter au client</p>
             <p className="mt-3 text-[15px] leading-relaxed">
               Budget pub recommandé : <b>{eur(r.budgetPub)}/mois</b> (versé à Meta) + honoraires Neela : <b>{eur(fee)}/mois</b>.
               Résultat visé : <b>~{num(r.rdv)} RDV</b>, <b>~{num1(r.ventes)} {V.ventes}</b>, soit <b>~{eur(r.margeGen)}</b> de marge.
-              {" "}Rentable dès <b>{Math.ceil(r.breakEven)}</b> ventes, retour <b>×{num1(r.roas)}</b>
+              {margeOk && <> {" "}Rentable dès <b>{Math.ceil(r.breakEven)}</b> ventes,</>} retour <b>×{num1(r.roas)}</b>
               {paybackIdx >= 0 ? <>, investissement récupéré au <b>mois {paybackIdx + 1}</b>.</> : "."}
             </p>
 
             <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
               <select
                 value=""
+                aria-label="Choisir un centre du CRM"
                 onChange={(e) => e.target.value && setCentreName(e.target.value)}
                 className="min-w-0 truncate rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none [color-scheme:dark]"
               >
@@ -743,7 +767,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
               <input
                 value={centreName}
                 onChange={(e) => setCentreName(e.target.value)}
-                placeholder="ou nom du centre…"
+                placeholder="ou nom du centre…" aria-label="Nom du centre"
                 className="min-w-0 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/50 outline-none"
               />
               <button
@@ -763,7 +787,7 @@ export default function AdPlanner({ centres = [] }: { centres?: { nom: string; v
 
           <p className="text-xs text-mut">
             Estimations indicatives (Meta = leads plus froids que Google ; plafond de zone et seuils = heuristiques de planification).
-            Présente la fourchette basse, et ne garantis jamais un nombre de RDV.
+            Présentez la fourchette basse, et ne garantissez jamais un nombre de RDV.
           </p>
         </div>
       </div>
