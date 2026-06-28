@@ -149,14 +149,16 @@ export default function AdSimulator() {
       <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
         {/* ----- Colonne composer + aperçu de la pub ----- */}
         <div className="rounded-[28px] border border-line bg-white p-5 shadow-float md:p-6">
-          {/* Métier */}
-          <div className="mb-4 inline-flex rounded-full border border-line bg-paper p-1">
-            {(Object.keys(METIERS) as MetierKey[]).map((k) => (
-              <button key={k} onClick={() => pickMetier(k)}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:text-sm ${metier === k ? "bg-accent text-white shadow-sm" : "text-mut hover:text-ink"}`}>
-                {METIERS[k].label}
-              </button>
-            ))}
+          {/* Métier — centré en haut du composeur */}
+          <div className="mb-4 flex justify-center">
+            <div className="inline-flex rounded-full border border-line bg-paper p-1">
+              {(Object.keys(METIERS) as MetierKey[]).map((k) => (
+                <button key={k} onClick={() => pickMetier(k)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:text-sm ${metier === k ? "bg-accent text-white shadow-sm" : "text-mut hover:text-ink"}`}>
+                  {METIERS[k].label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Visuels */}
