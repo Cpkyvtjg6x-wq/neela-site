@@ -6,6 +6,7 @@ import LePont from "@/components/LePont";
 import FeatureRow from "@/components/FeatureRow";
 import MetaAdsLive from "@/components/MetaAdsLive";
 import HorizontalAds from "@/components/HorizontalAds";
+import AdSimulator from "@/components/AdSimulator";
 import Testimonials from "@/components/Testimonials";
 import GuaranteeBand from "@/components/GuaranteeBand";
 import Faq from "@/components/Faq";
@@ -66,6 +67,9 @@ export default function HomePage() {
 
       {/* Showcase créatives — défilé horizontal cinématique */}
       <HorizontalAds />
+
+      {/* Démo interactive : composez une pub → RDV en direct */}
+      <AdSimulator />
 
       {/* 03 — Accueillir & piloter : le CRM / la réception (image) */}
       <FeatureRow
