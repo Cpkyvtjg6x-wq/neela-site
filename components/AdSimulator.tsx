@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { ThumbsUp, MessageCircle, Share2, CalendarCheck, TrendingUp, Play, RotateCcw, Sparkles } from "lucide-react";
+import { ThumbsUp, MessageCircle, Share2, CalendarCheck, TrendingUp, Play, Sparkles } from "lucide-react";
 
 /**
- * Mini-simulateur interactif : le visiteur compose une pub (visuel + accroche),
- * lance la « campagne », et voit en direct la diffusion, les stats et les RDV
- * qui tombent. Démo stylisée, chiffres plausibles — pas un compte réel.
+ * Mini-simulateur interactif : le visiteur compose une pub (visuel + accroche)
+ * dans la colonne de gauche, et voit à droite l'aperçu puis — après lancement —
+ * la diffusion, les stats et les RDV qui tombent. Compacté pour tenir sur un
+ * écran d'ordinateur sans scroller. Démo stylisée, chiffres plausibles.
  * Aucune écriture n'est incrustée sur les visuels (texte = UI uniquement).
  */
 
@@ -133,28 +134,28 @@ export default function AdSimulator() {
   const pickHook = (i: number) => { setHookIdx(i); setHook(m.hooks[i]); };
 
   return (
-    <section className="container-wide py-24 md:py-32">
-      <div className="mx-auto mb-10 max-w-2xl text-center">
-        <p className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-accent">
-          <Sparkles size={13} /> Démo interactive
+    <section className="container-wide py-9 md:py-11">
+      <div className="mx-auto mb-5 max-w-2xl text-center">
+        <p className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">
+          <Sparkles size={12} /> Démo interactive
         </p>
-        <h2 className="font-display text-[clamp(1.8rem,4.2vw,3.2rem)] font-bold leading-[1.05] tracking-[-0.03em]">
+        <h2 className="font-display text-[clamp(1.35rem,2.8vw,2.05rem)] font-bold leading-[1.07] tracking-[-0.03em]">
           Composez une pub, <span className="text-accent">voyez l'agenda se remplir.</span>
         </h2>
-        <p className="mx-auto mt-4 max-w-md text-lg text-mut">
-          Choisissez un visuel et une accroche, lancez la campagne, et regardez les rendez-vous tomber. En 10 secondes.
+        <p className="mx-auto mt-2 max-w-md text-[15px] text-mut">
+          Un visuel, une accroche, et regardez les rendez-vous tomber — en direct.
         </p>
       </div>
 
-      <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
-        {/* ----- Colonne composer + aperçu de la pub ----- */}
-        <div className="rounded-[28px] border border-line bg-white p-5 shadow-float md:p-6">
-          {/* Métier — centré en haut du composeur */}
-          <div className="mb-4 flex justify-center">
+      <div className="mx-auto grid max-w-5xl items-stretch gap-5 lg:grid-cols-2">
+        {/* ----- Colonne gauche : composer ----- */}
+        <div className="flex flex-col rounded-[24px] border border-line bg-white p-4 shadow-float md:p-5">
+          {/* Métier — centré */}
+          <div className="mb-3 flex justify-center">
             <div className="inline-flex rounded-full border border-line bg-paper p-1">
               {(Object.keys(METIERS) as MetierKey[]).map((k) => (
                 <button key={k} onClick={() => pickMetier(k)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:text-sm ${metier === k ? "bg-accent text-white shadow-sm" : "text-mut hover:text-ink"}`}>
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${metier === k ? "bg-accent text-white shadow-sm" : "text-mut hover:text-ink"}`}>
                   {METIERS[k].label}
                 </button>
               ))}
@@ -162,19 +163,19 @@ export default function AdSimulator() {
           </div>
 
           {/* Visuels */}
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-mut">Le visuel</p>
-          <div className="mb-5 grid grid-cols-3 gap-2">
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-mut">Le visuel</p>
+          <div className="mb-3 grid grid-cols-3 gap-2">
             {m.visuals.map((v, i) => (
               <button key={v.src} onClick={() => setVisualIdx(i)} aria-label={`Visuel ${i + 1}`}
-                className={`relative aspect-square overflow-hidden rounded-xl border-2 transition ${visualIdx === i ? "border-accent ring-2 ring-accent/20" : "border-transparent opacity-70 hover:opacity-100"}`}>
-                <Image src={v.src} alt={v.alt} fill sizes="120px" className="object-cover" />
+                className={`relative aspect-[4/3] overflow-hidden rounded-lg border-2 transition ${visualIdx === i ? "border-accent ring-2 ring-accent/20" : "border-transparent opacity-70 hover:opacity-100"}`}>
+                <Image src={v.src} alt={v.alt} fill sizes="140px" className="object-cover" />
               </button>
             ))}
           </div>
 
           {/* Accroche */}
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-mut">L'accroche</p>
-          <div className="mb-3 flex flex-wrap gap-1.5">
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-mut">L'accroche</p>
+          <div className="mb-2 flex flex-wrap gap-1.5">
             {m.hooks.map((h, i) => (
               <button key={h} onClick={() => pickHook(i)}
                 className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${hookIdx === i ? "border-accent bg-accent text-white" : "border-line text-mut hover:border-accent"}`}>
@@ -186,52 +187,21 @@ export default function AdSimulator() {
             aria-label="Texte de l'accroche"
             className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-accent" />
 
-          {/* Aperçu façon publication Meta */}
-          <div className="mt-5 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
-            <div className="flex items-center gap-2.5 px-3 py-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/12 font-display text-sm font-bold text-accent">N</span>
-              <div className="leading-tight">
-                <p className="text-[13px] font-bold text-ink">{m.page}</p>
-                <p className="text-[10px] text-mut">Sponsorisé · <span className="text-accent">@vous</span></p>
-              </div>
-              <span className="ml-auto text-mut">···</span>
-            </div>
-            <p className="px-3 pb-2.5 text-[13px] leading-snug text-ink">{hook}</p>
-            <div className="relative aspect-[4/3] w-full">
-              <Image src={m.visuals[visualIdx].src} alt={m.visuals[visualIdx].alt} fill sizes="(max-width:1024px) 100vw, 500px" className="object-cover" />
-            </div>
-            <div className="flex items-center justify-between border-t border-line px-3 py-2">
-              <span className="text-[12px] font-semibold text-ink">{m.label}</span>
-              <span className="rounded-lg bg-accent px-3 py-1.5 text-[12px] font-bold text-white">Prendre rendez-vous</span>
-            </div>
-            <div className="flex items-center gap-5 border-t border-line px-3 py-2 text-mut">
-              <span className="flex items-center gap-1 text-[11px]"><ThumbsUp size={13} /> J'aime</span>
-              <span className="flex items-center gap-1 text-[11px]"><MessageCircle size={13} /> Commenter</span>
-              <span className="flex items-center gap-1 text-[11px]"><Share2 size={13} /> Partager</span>
-            </div>
-          </div>
-
           <button onClick={() => setStage("live")}
-            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-3 text-sm font-bold text-white transition hover:opacity-90">
+            className="mt-auto flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-3 text-sm font-bold text-white transition hover:opacity-90">
             <Play size={16} /> {stage === "live" ? "Relancer la campagne" : "Lancer la campagne"}
           </button>
         </div>
 
-        {/* ----- Colonne résultats live ----- */}
-        <div className="rounded-[28px] border border-line bg-white p-5 shadow-float md:p-6">
+        {/* ----- Colonne droite : aperçu (compose) → résultats live ----- */}
+        <div className="rounded-[24px] border border-line bg-white p-4 shadow-float md:p-5">
           <AnimatePresence mode="wait">
             {stage === "compose" ? (
-              <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="flex h-full min-h-[360px] flex-col items-center justify-center text-center">
-                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/10 text-accent">
-                  <TrendingUp size={26} />
-                </span>
-                <p className="mt-4 max-w-[15rem] text-sm text-mut">
-                  Cliquez sur <b className="text-ink">Lancer la campagne</b> pour voir la diffusion et les rendez-vous arriver en direct.
-                </p>
+              <motion.div key="preview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                <AdPreview m={m} hook={hook} visualIdx={visualIdx} />
               </motion.div>
             ) : (
-              <LiveBoard key={`live-${metier}-${visualIdx}-${hookIdx}`} m={m} stats={stats} />
+              <LiveBoard key={`live-${metier}-${visualIdx}-${hookIdx}`} m={m} hook={hook} visualIdx={visualIdx} stats={stats} />
             )}
           </AnimatePresence>
         </div>
@@ -240,9 +210,38 @@ export default function AdSimulator() {
   );
 }
 
-function LiveBoard({ m, stats }: { m: Metier; stats: ReturnType<typeof computeStats> }) {
+// Aperçu façon publication Meta (visuel + accroche + CTA).
+function AdPreview({ m, hook, visualIdx }: { m: Metier; hook: string; visualIdx: number }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-card">
+      <div className="flex items-center gap-2.5 px-3 py-2.5">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/12 font-display text-sm font-bold text-accent">N</span>
+        <div className="leading-tight">
+          <p className="text-[13px] font-bold text-ink">{m.page}</p>
+          <p className="text-[10px] text-mut">Sponsorisé · <span className="text-accent">@vous</span></p>
+        </div>
+        <span className="ml-auto text-mut">···</span>
+      </div>
+      <p className="px-3 pb-2.5 text-[13px] leading-snug text-ink">{hook}</p>
+      <div className="relative aspect-[4/3] w-full">
+        <Image src={m.visuals[visualIdx].src} alt={m.visuals[visualIdx].alt} fill sizes="(max-width:1024px) 100vw, 480px" className="object-cover" />
+      </div>
+      <div className="flex items-center justify-between border-t border-line px-3 py-2">
+        <span className="text-[12px] font-semibold text-ink">{m.label}</span>
+        <span className="rounded-lg bg-accent px-3 py-1.5 text-[12px] font-bold text-white">Prendre rendez-vous</span>
+      </div>
+      <div className="flex items-center gap-5 border-t border-line px-3 py-1.5 text-mut">
+        <span className="flex items-center gap-1 text-[11px]"><ThumbsUp size={12} /> J'aime</span>
+        <span className="flex items-center gap-1 text-[11px]"><MessageCircle size={12} /> Commenter</span>
+        <span className="flex items-center gap-1 text-[11px]"><Share2 size={12} /> Partager</span>
+      </div>
+    </div>
+  );
+}
+
+function LiveBoard({ m, hook, visualIdx, stats }: { m: Metier; hook: string; visualIdx: number; stats: ReturnType<typeof computeStats> }) {
   const reduce = useReducedMotion();
-  const total = Math.min(stats.rdv, 6);
+  const total = Math.min(stats.rdv, 3);
   const [shown, setShown] = useState(reduce ? total : 0);
   const [done, setDone] = useState(reduce);
 
@@ -252,8 +251,8 @@ function LiveBoard({ m, stats }: { m: Metier; stats: ReturnType<typeof computeSt
     const id = setInterval(() => {
       i += 1;
       setShown(i);
-      if (i >= total) { clearInterval(id); setTimeout(() => setDone(true), 700); }
-    }, 760);
+      if (i >= total) { clearInterval(id); setTimeout(() => setDone(true), 600); }
+    }, 700);
     return () => clearInterval(id);
   }, [total, reduce]);
 
@@ -264,65 +263,66 @@ function LiveBoard({ m, stats }: { m: Metier; stats: ReturnType<typeof computeSt
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-4 flex items-center gap-2">
-        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#1877F2] text-[12px] font-bold text-white">f</span>
-        <span className="text-[13px] font-bold text-ink/80">Campagne en direct</span>
-        <span className="ml-auto flex items-center gap-1.5 text-[11px] text-emerald-600">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" /> diffusion active
+      {/* Rappel de la pub composée */}
+      <div className="mb-3 flex items-center gap-2.5 rounded-xl border border-line bg-paper p-2">
+        <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg">
+          <Image src={m.visuals[visualIdx].src} alt="" fill sizes="36px" className="object-cover" />
+        </span>
+        <p className="line-clamp-1 text-[12px] font-medium text-ink">{hook}</p>
+        <span className="ml-auto flex items-center gap-1.5 whitespace-nowrap text-[11px] text-emerald-600">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" /> en direct
         </span>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-3 gap-2">
         {[
-          { v: <CountUp to={stats.impr} />, l: "personnes touchées" },
+          { v: <CountUp to={stats.impr} />, l: "touchées" },
           { v: <CountUp to={stats.clics} />, l: "clics" },
           { v: <><CountUp to={stats.coutRdv} /> €</>, l: "coût / RDV" },
         ].map((k, i) => (
-          <div key={i} className="rounded-xl border border-line bg-paper p-3">
-            <div className="font-display text-lg font-bold text-ink">{k.v}</div>
-            <div className="text-[11px] text-mut">{k.l}</div>
+          <div key={i} className="rounded-xl border border-line bg-paper p-2.5">
+            <div className="font-display text-base font-bold text-ink">{k.v}</div>
+            <div className="text-[10px] text-mut">{k.l}</div>
           </div>
         ))}
       </div>
 
       {/* Graphe RDV/jour */}
-      <div className="mt-3 rounded-xl border border-line bg-paper p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-[12px] font-bold text-ink/70">Rendez-vous / jour</span>
-          <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600"><TrendingUp size={13} /> en hausse</span>
+      <div className="mt-2.5 rounded-xl border border-line bg-paper p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[11px] font-bold text-ink/70">Rendez-vous / jour</span>
+          <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600"><TrendingUp size={12} /> en hausse</span>
         </div>
-        <div className="flex h-24 items-end gap-2">
+        <div className="flex h-14 items-end gap-1.5">
           {BARS.map((h, i) => (
-            <motion.div key={i} className={`flex-1 rounded-md ${i >= 5 ? "bg-accent" : "bg-accent/25"}`}
+            <motion.div key={i} className={`flex-1 rounded ${i >= 5 ? "bg-accent" : "bg-accent/25"}`}
               initial={{ height: reduce ? `${h}%` : 0 }} animate={{ height: `${h}%` }}
-              transition={{ duration: 0.5, delay: reduce ? 0 : i * 0.08, ease: "easeOut" }} />
+              transition={{ duration: 0.5, delay: reduce ? 0 : i * 0.07, ease: "easeOut" }} />
           ))}
         </div>
       </div>
 
       {/* Flux RDV entrants */}
-      <div className="mt-3 flex-1">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mut">Rendez-vous entrants</p>
-          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
-            {shown}{shown >= total && stats.rdv > total ? `+ · ${stats.rdv} ce mois` : ""}
-          </span>
+      <div className="mt-2.5">
+        <div className="mb-1.5 flex items-center justify-between">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mut">Rendez-vous entrants</p>
+          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">{shown >= total ? stats.rdv : shown} ce mois</span>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <AnimatePresence>
             {feed.slice(0, shown).map((r, i) => (
               <motion.div key={i} layout
-                initial={{ opacity: 0, y: reduce ? 0 : -10, scale: reduce ? 1 : 0.97 }}
+                initial={{ opacity: 0, y: reduce ? 0 : -8, scale: reduce ? 1 : 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.35 }}
-                className="flex items-center gap-3 rounded-xl border border-line bg-white p-2.5 shadow-card">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/12 text-emerald-600">
-                  <CalendarCheck size={16} />
+                transition={{ duration: 0.32 }}
+                className="flex items-center gap-2.5 rounded-lg border border-line bg-white p-2 shadow-card">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/12 text-emerald-600">
+                  <CalendarCheck size={14} />
                 </span>
                 <div className="leading-tight">
-                  <p className="text-[13px] font-bold text-ink">Nouveau rendez-vous</p>
-                  <p className="text-[11px] text-mut">{r.motif} · {r.ville}</p>
+                  <p className="text-[12px] font-bold text-ink">Nouveau rendez-vous</p>
+                  <p className="text-[10px] text-mut">{r.motif} · {r.ville}</p>
                 </div>
                 <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">+1</span>
               </motion.div>
@@ -335,16 +335,18 @@ function LiveBoard({ m, stats }: { m: Metier; stats: ReturnType<typeof computeSt
       <AnimatePresence>
         {done && (
           <motion.div initial={{ opacity: 0, y: reduce ? 0 : 8 }} animate={{ opacity: 1, y: 0 }}
-            className="mt-4 rounded-2xl border border-line bg-[#0a1430] p-4 text-white">
-            <p className="text-[13px] leading-relaxed">
-              <b className="text-white">~{fr(stats.rdv)} rendez-vous</b> ce mois-ci, soit
-              <b className="text-[#9CC2FF]"> ~{fr(stats.marge)} €</b> de marge potentielle pour votre centre.
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Link href="/contact" className="rounded-xl bg-accent px-4 py-2 text-sm font-bold text-white hover:opacity-90">
-                Obtenir ces résultats →
-              </Link>
-              <span className="text-[11px] text-white/60">Démo · chiffres indicatifs</span>
+            className="mt-auto pt-3">
+            <div className="rounded-xl border border-line bg-[#0a1430] p-3 text-white">
+              <p className="text-[12px] leading-relaxed">
+                <b className="text-white">~{fr(stats.rdv)} rendez-vous</b> ce mois-ci, soit
+                <b className="text-[#9CC2FF]"> ~{fr(stats.marge)} €</b> de marge potentielle.
+              </p>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                <Link href="/contact" className="rounded-lg bg-accent px-3.5 py-1.5 text-[13px] font-bold text-white hover:opacity-90">
+                  Obtenir ces résultats →
+                </Link>
+                <span className="text-[10px] text-white/55">Démo · chiffres indicatifs</span>
+              </div>
             </div>
           </motion.div>
         )}
