@@ -4,14 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { ThumbsUp, MessageCircle, Share2, CalendarCheck, TrendingUp, Play, Sparkles } from "lucide-react";
+import { ThumbsUp, MessageCircle, CalendarCheck, TrendingUp, Play, Sparkles } from "lucide-react";
 
 /**
- * Mini-simulateur interactif : le visiteur compose une pub (visuel + accroche)
- * dans la colonne de gauche, et voit à droite l'aperçu puis — après lancement —
- * la diffusion, les stats et les RDV qui tombent. Compacté pour tenir sur un
- * écran d'ordinateur sans scroller. Démo stylisée, chiffres plausibles.
- * Aucune écriture n'est incrustée sur les visuels (texte = UI uniquement).
+ * Mini-simulateur interactif : à gauche on compose la pub (visuel + accroche, qui
+ * s'affiche directement sur le rendu) ; à droite, au lancement, la diffusion, les
+ * stats et les RDV qui tombent. Compacté pour tenir sur un écran sans scroller.
+ * Démo stylisée — aucune écriture n'est incrustée DANS les visuels (texte = UI).
  */
 
 type MetierKey = "audio" | "optique" | "dentaire";
@@ -122,19 +121,16 @@ export default function AdSimulator() {
   const [metier, setMetier] = useState<MetierKey>("audio");
   const [visualIdx, setVisualIdx] = useState(0);
   const [hookIdx, setHookIdx] = useState(0);
-  const [hook, setHook] = useState(METIERS.audio.hooks[0]);
   const [stage, setStage] = useState<"compose" | "live">("compose");
 
   const m = METIERS[metier];
+  const hook = m.hooks[hookIdx];
   const stats = useMemo(() => computeStats(m, visualIdx, hookIdx), [m, visualIdx, hookIdx]);
 
-  const pickMetier = (k: MetierKey) => {
-    setMetier(k); setVisualIdx(0); setHookIdx(0); setHook(METIERS[k].hooks[0]); setStage("compose");
-  };
-  const pickHook = (i: number) => { setHookIdx(i); setHook(m.hooks[i]); };
+  const pickMetier = (k: MetierKey) => { setMetier(k); setVisualIdx(0); setHookIdx(0); setStage("compose"); };
 
   return (
-    <section className="container-wide py-9 md:py-11">
+    <section className="container-wide py-8 md:py-10">
       <div className="mx-auto mb-5 max-w-2xl text-center">
         <p className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">
           <Sparkles size={12} /> Démo interactive
@@ -148,7 +144,7 @@ export default function AdSimulator() {
       </div>
 
       <div className="mx-auto grid max-w-5xl items-stretch gap-5 lg:grid-cols-2">
-        {/* ----- Colonne gauche : composer ----- */}
+        {/* ----- Colonne gauche : composer + rendu de la pub ----- */}
         <div className="flex flex-col rounded-[24px] border border-line bg-white p-4 shadow-float md:p-5">
           {/* Métier — centré */}
           <div className="mb-3 flex justify-center">
@@ -173,35 +169,66 @@ export default function AdSimulator() {
             ))}
           </div>
 
-          {/* Accroche */}
+          {/* Accroches — modifient directement le rendu */}
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-mut">L'accroche</p>
-          <div className="mb-2 flex flex-wrap gap-1.5">
+          <div className="mb-3 flex flex-wrap gap-1.5">
             {m.hooks.map((h, i) => (
-              <button key={h} onClick={() => pickHook(i)}
+              <button key={h} onClick={() => setHookIdx(i)}
                 className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${hookIdx === i ? "border-accent bg-accent text-white" : "border-line text-mut hover:border-accent"}`}>
                 Accroche {i + 1}
               </button>
             ))}
           </div>
-          <input value={hook} onChange={(e) => setHook(e.target.value)} maxLength={90}
-            aria-label="Texte de l'accroche"
-            className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-accent" />
+
+          {/* Rendu de la pub (remplit l'espace, image extensible) */}
+          <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-line shadow-card">
+            <div className="flex items-center gap-2.5 px-3 py-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/12 font-display text-sm font-bold text-accent">N</span>
+              <div className="leading-tight">
+                <p className="text-[13px] font-bold text-ink">{m.page}</p>
+                <p className="text-[10px] text-mut">Sponsorisé · <span className="text-accent">@vous</span></p>
+              </div>
+              <span className="ml-auto text-mut">···</span>
+            </div>
+            <AnimatePresence mode="wait">
+              <motion.p key={hook} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
+                className="px-3 pb-2 text-[13px] font-medium leading-snug text-ink">
+                {hook}
+              </motion.p>
+            </AnimatePresence>
+            <div className="relative min-h-[120px] w-full flex-1">
+              <Image src={m.visuals[visualIdx].src} alt={m.visuals[visualIdx].alt} fill sizes="(max-width:1024px) 100vw, 480px" className="object-cover" />
+            </div>
+            <div className="flex items-center justify-between border-t border-line px-3 py-2">
+              <div className="flex items-center gap-3 text-mut">
+                <span className="flex items-center gap-1 text-[11px]"><ThumbsUp size={12} /> J'aime</span>
+                <span className="flex items-center gap-1 text-[11px]"><MessageCircle size={12} /> Commenter</span>
+              </div>
+              <span className="rounded-lg bg-accent px-3 py-1.5 text-[12px] font-bold text-white">Prendre rendez-vous</span>
+            </div>
+          </div>
 
           <button onClick={() => setStage("live")}
-            className="mt-auto flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-3 text-sm font-bold text-white transition hover:opacity-90">
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-3 text-sm font-bold text-white transition hover:opacity-90">
             <Play size={16} /> {stage === "live" ? "Relancer la campagne" : "Lancer la campagne"}
           </button>
         </div>
 
-        {/* ----- Colonne droite : aperçu (compose) → résultats live ----- */}
-        <div className="rounded-[24px] border border-line bg-white p-4 shadow-float md:p-5">
+        {/* ----- Colonne droite : analyse (idle → live) ----- */}
+        <div className="flex flex-col rounded-[24px] border border-line bg-white p-4 shadow-float md:p-5">
           <AnimatePresence mode="wait">
             {stage === "compose" ? (
-              <motion.div key="preview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                <AdPreview m={m} hook={hook} visualIdx={visualIdx} />
+              <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="flex h-full min-h-[300px] flex-col items-center justify-center text-center">
+                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+                  <TrendingUp size={26} />
+                </span>
+                <p className="mt-4 max-w-[16rem] text-sm text-mut">
+                  Cliquez sur <b className="text-ink">Lancer la campagne</b> pour voir la diffusion et les rendez-vous arriver en direct.
+                </p>
               </motion.div>
             ) : (
-              <LiveBoard key={`live-${metier}-${visualIdx}-${hookIdx}`} m={m} hook={hook} visualIdx={visualIdx} stats={stats} />
+              <LiveBoard key={`live-${metier}-${visualIdx}-${hookIdx}`} m={m} stats={stats} />
             )}
           </AnimatePresence>
         </div>
@@ -210,38 +237,9 @@ export default function AdSimulator() {
   );
 }
 
-// Aperçu façon publication Meta (visuel + accroche + CTA).
-function AdPreview({ m, hook, visualIdx }: { m: Metier; hook: string; visualIdx: number }) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-card">
-      <div className="flex items-center gap-2.5 px-3 py-2.5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/12 font-display text-sm font-bold text-accent">N</span>
-        <div className="leading-tight">
-          <p className="text-[13px] font-bold text-ink">{m.page}</p>
-          <p className="text-[10px] text-mut">Sponsorisé · <span className="text-accent">@vous</span></p>
-        </div>
-        <span className="ml-auto text-mut">···</span>
-      </div>
-      <p className="px-3 pb-2.5 text-[13px] leading-snug text-ink">{hook}</p>
-      <div className="relative aspect-[4/3] w-full">
-        <Image src={m.visuals[visualIdx].src} alt={m.visuals[visualIdx].alt} fill sizes="(max-width:1024px) 100vw, 480px" className="object-cover" />
-      </div>
-      <div className="flex items-center justify-between border-t border-line px-3 py-2">
-        <span className="text-[12px] font-semibold text-ink">{m.label}</span>
-        <span className="rounded-lg bg-accent px-3 py-1.5 text-[12px] font-bold text-white">Prendre rendez-vous</span>
-      </div>
-      <div className="flex items-center gap-5 border-t border-line px-3 py-1.5 text-mut">
-        <span className="flex items-center gap-1 text-[11px]"><ThumbsUp size={12} /> J'aime</span>
-        <span className="flex items-center gap-1 text-[11px]"><MessageCircle size={12} /> Commenter</span>
-        <span className="flex items-center gap-1 text-[11px]"><Share2 size={12} /> Partager</span>
-      </div>
-    </div>
-  );
-}
-
-function LiveBoard({ m, hook, visualIdx, stats }: { m: Metier; hook: string; visualIdx: number; stats: ReturnType<typeof computeStats> }) {
+function LiveBoard({ m, stats }: { m: Metier; stats: ReturnType<typeof computeStats> }) {
   const reduce = useReducedMotion();
-  const total = Math.min(stats.rdv, 3);
+  const total = Math.min(stats.rdv, 4);
   const [shown, setShown] = useState(reduce ? total : 0);
   const [done, setDone] = useState(reduce);
 
@@ -263,14 +261,11 @@ function LiveBoard({ m, hook, visualIdx, stats }: { m: Metier; hook: string; vis
 
   return (
     <div className="flex h-full flex-col">
-      {/* Rappel de la pub composée */}
-      <div className="mb-3 flex items-center gap-2.5 rounded-xl border border-line bg-paper p-2">
-        <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg">
-          <Image src={m.visuals[visualIdx].src} alt="" fill sizes="36px" className="object-cover" />
-        </span>
-        <p className="line-clamp-1 text-[12px] font-medium text-ink">{hook}</p>
-        <span className="ml-auto flex items-center gap-1.5 whitespace-nowrap text-[11px] text-emerald-600">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" /> en direct
+      <div className="mb-3 flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#1877F2] text-[12px] font-bold text-white">f</span>
+        <span className="text-[13px] font-bold text-ink/80">Campagne en direct</span>
+        <span className="ml-auto flex items-center gap-1.5 text-[11px] text-emerald-600">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" /> diffusion active
         </span>
       </div>
 
@@ -331,21 +326,19 @@ function LiveBoard({ m, hook, visualIdx, stats }: { m: Metier; hook: string; vis
         </div>
       </div>
 
-      {/* Bilan + CTA */}
+      {/* Bilan + CTA — carte claire (vert succès), plus de bleu marine */}
       <AnimatePresence>
         {done && (
-          <motion.div initial={{ opacity: 0, y: reduce ? 0 : 8 }} animate={{ opacity: 1, y: 0 }}
-            className="mt-auto pt-3">
-            <div className="rounded-xl border border-line bg-[#0a1430] p-3 text-white">
-              <p className="text-[12px] leading-relaxed">
-                <b className="text-white">~{fr(stats.rdv)} rendez-vous</b> ce mois-ci, soit
-                <b className="text-[#9CC2FF]"> ~{fr(stats.marge)} €</b> de marge potentielle.
+          <motion.div initial={{ opacity: 0, y: reduce ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} className="mt-auto pt-3">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+              <p className="text-[12.5px] leading-relaxed text-ink">
+                <b>~{fr(stats.rdv)} rendez-vous</b> ce mois-ci, soit <b className="text-emerald-700">~{fr(stats.marge)} €</b> de marge potentielle.
               </p>
               <div className="mt-2.5 flex flex-wrap items-center gap-2">
                 <Link href="/contact" className="rounded-lg bg-accent px-3.5 py-1.5 text-[13px] font-bold text-white hover:opacity-90">
                   Obtenir ces résultats →
                 </Link>
-                <span className="text-[10px] text-white/55">Démo · chiffres indicatifs</span>
+                <span className="text-[10px] text-mut">Démo · chiffres indicatifs</span>
               </div>
             </div>
           </motion.div>
