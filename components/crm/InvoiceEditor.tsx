@@ -246,16 +246,11 @@ export default function InvoiceEditor({
             </div>
           </div>
 
-          {/* Parties */}
-          <div className="mb-6 grid grid-cols-2 gap-3">
-            <div className="rounded-lg border border-line p-3">
-              <p className="mb-1 text-[9px] uppercase tracking-[0.12em] text-mut">Émetteur</p>
-              <p className="text-[13px] font-bold">{emitter.nom || "Neela"}</p>
-              <p className="whitespace-pre-line text-[11px] leading-snug text-mut">{emitter.adresse}{emitter.siret ? `\nSIRET ${emitter.siret}` : ""}</p>
-            </div>
-            <div className="rounded-lg border border-line p-3">
-              <p className="mb-1 text-[9px] uppercase tracking-[0.12em] text-mut">Client</p>
-              <Txt value={client.nom} set={onClientName} list="crm-centres" placeholder="Nom / raison sociale *" className="block w-full text-[13px] font-bold" />
+          {/* Client uniquement (l'émetteur est déjà en en-tête) — sans cadre */}
+          <div className="mb-7 flex justify-end">
+            <div className="w-full max-w-[320px]">
+              <p className="mb-1 text-[9px] uppercase tracking-[0.12em] text-mut">{isDevis ? "Client" : "Facturé à"}</p>
+              <Txt value={client.nom} set={onClientName} list="crm-centres" placeholder="Nom / raison sociale *" className="block w-full text-[14px] font-bold" />
               <Area value={client.adresse} set={(v) => setClient({ ...client, adresse: v })} placeholder="Adresse" className="text-[11px] text-mut" />
               <div className="text-[11px] text-mut">SIRET <Txt value={client.siret} set={(v) => setClient({ ...client, siret: v })} placeholder="—" auto className="text-[11px]" /></div>
               <Txt value={client.email} set={(v) => setClient({ ...client, email: v })} placeholder="email" className="block w-full text-[11px] text-mut" />
@@ -309,10 +304,10 @@ export default function InvoiceEditor({
               <>
                 <div className="flex justify-between"><span className="text-mut">Total HT</span><span className="font-medium tabular-nums">{eur2(t.ht)}</span></div>
                 <div className="flex justify-between"><span className="text-mut">TVA {vatRate}&nbsp;%</span><span className="font-medium tabular-nums">{eur2(t.tva)}</span></div>
-                <div className="flex justify-between border-t-2 border-ink pt-1.5 font-display text-base font-bold"><span>Total TTC</span><span className="tabular-nums">{eur2(t.ttc)}</span></div>
+                <div className="flex justify-between border-t-2 border-ink pt-1.5 font-display text-base font-bold"><span>Montant total TTC</span><span className="tabular-nums">{eur2(t.ttc)}</span></div>
               </>
             ) : (
-              <div className="flex justify-between border-t-2 border-ink pt-1.5 font-display text-base font-bold"><span>Total</span><span className="tabular-nums">{eur2(t.ttc)}</span></div>
+              <div className="flex justify-between border-t-2 border-ink pt-1.5 font-display text-base font-bold"><span>Montant total TTC</span><span className="tabular-nums">{eur2(t.ttc)}</span></div>
             )}
             {!isDevis && (deposit > 0 ? (
               <>

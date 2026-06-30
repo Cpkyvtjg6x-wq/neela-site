@@ -143,8 +143,8 @@ export function invoiceHTML(inv: Invoice): string {
   const tvaLines = inv.vat_enabled
     ? `<tr><td>Total HT</td><td class="r">${eur2(t.ht)}</td></tr>
        <tr><td>TVA ${inv.vat_rate} %</td><td class="r">${eur2(t.tva)}</td></tr>
-       <tr class="tot"><td>Total TTC</td><td class="r">${eur2(t.ttc)}</td></tr>`
-    : `<tr class="tot"><td>Total</td><td class="r">${eur2(t.ttc)}</td></tr>`;
+       <tr class="tot"><td>Montant total TTC</td><td class="r">${eur2(t.ttc)}</td></tr>`
+    : `<tr class="tot"><td>Montant total TTC</td><td class="r">${eur2(t.ttc)}</td></tr>`;
   const depositLine = !isDevis && inv.deposit > 0 ? `<tr><td>Acompte déjà versé</td><td class="r">− ${eur2(inv.deposit)}</td></tr><tr class="tot"><td>Net à payer</td><td class="r">${eur2(t.net)}</td></tr>` : "";
   const discLine = t.disc > 0 ? `<tr><td>Remise</td><td class="r">− ${eur2(t.disc)}</td></tr>` : "";
   const vatMention = inv.vat_enabled ? "" : `<p class="mention">TVA non applicable, art. 293 B du CGI.</p>`;
@@ -225,9 +225,8 @@ export function invoiceHTML(inv: Invoice): string {
     </div>
   </div>
 
-  <div class="parties">
-    <div class="box"><div class="lab">Émetteur</div><div class="nm">${esc(e.nom || "Neela")}</div><div class="em">${esc(e.adresse || "")}${e.siret ? `<br>SIRET ${esc(e.siret)}` : ""}</div></div>
-    <div class="box"><div class="lab">Client</div><div class="nm">${esc(c.nom || "—")}</div><div class="em">${esc(c.adresse || "")}${c.siret ? `<br>SIRET ${esc(c.siret)}` : ""}${c.email ? `<br>${esc(c.email)}` : ""}</div></div>
+  <div class="parties" style="justify-content:flex-end">
+    <div style="width:50%"><div class="lab">${isDevis ? "Client" : "Facturé à"}</div><div class="nm">${esc(c.nom || "—")}</div><div class="em">${esc(c.adresse || "")}${c.siret ? `<br>SIRET ${esc(c.siret)}` : ""}${c.email ? `<br>${esc(c.email)}` : ""}</div></div>
   </div>
 
   <table>
