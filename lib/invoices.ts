@@ -180,7 +180,8 @@ export function invoiceHTML(inv: Invoice): string {
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${title} ${esc(inv.number)}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{position:relative;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0A0A0A;padding:46px;max-width:820px;margin:auto;font-size:13px;line-height:1.5}
+  body{position:relative;display:flex;flex-direction:column;min-height:100vh;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0A0A0A;padding:50px 48px 30px;max-width:820px;margin:auto;font-size:13px;line-height:1.5}
+  .mid{flex:1 0 auto;display:flex;flex-direction:column;justify-content:center;padding:28px 0}
   .bar{position:fixed;top:0;left:0;right:0;height:6px;background:#2563EB}
   .stamp{position:absolute;top:54px;right:46px;transform:rotate(-11deg);border:3px solid;border-radius:8px;padding:3px 14px;font-weight:800;font-size:20px;letter-spacing:2px;opacity:.85}
   .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:34px}
@@ -209,7 +210,7 @@ export function invoiceHTML(inv: Invoice): string {
   .sign .sigbox{width:280px;height:92px;border:1px dashed rgba(10,10,10,.28);border-radius:10px}
   .mention{margin-top:14px;font-size:12px;color:#444;font-style:italic}
   .foot{margin-top:28px;border-top:1px solid rgba(10,10,10,.1);padding-top:12px;font-size:10.5px;color:#888;line-height:1.6}
-  .legal{margin-top:12px;text-align:center;font-size:9px;color:#aab0ba;line-height:1.55}
+  .legal{margin-top:24px;border-top:1px solid rgba(10,10,10,.08);padding-top:12px;text-align:center;font-size:9px;color:#aab0ba;line-height:1.55}
   @media print{body{padding:24px}}
 </style></head><body>
   <div class="bar"></div>
@@ -225,6 +226,7 @@ export function invoiceHTML(inv: Invoice): string {
     </div>
   </div>
 
+  <div class="mid">
   <div class="parties" style="justify-content:flex-end">
     <div style="width:50%"><div class="lab">${isDevis ? "Client" : "Facturé à"}</div><div class="nm">${esc(c.nom || "—")}</div><div class="em">${esc(c.adresse || "")}${c.siret ? `<br>SIRET ${esc(c.siret)}` : ""}${c.email ? `<br>${esc(c.email)}` : ""}</div></div>
   </div>
@@ -240,6 +242,7 @@ export function invoiceHTML(inv: Invoice): string {
   ${bottom}
 
   <div class="foot">${foot}</div>
+  </div>
   <div class="legal">${esc(LEGAL_MENTIONS)}${banque}</div>
   <script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script>
 </body></html>`;
