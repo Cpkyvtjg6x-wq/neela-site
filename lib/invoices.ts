@@ -180,9 +180,11 @@ export function invoiceHTML(inv: Invoice): string {
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${title} ${esc(inv.number)}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{position:relative;display:flex;flex-direction:column;min-height:100vh;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0A0A0A;padding:50px 48px 30px;max-width:820px;margin:auto;font-size:13px;line-height:1.5}
-  .mid{flex:1 0 auto;display:flex;flex-direction:column;justify-content:center;padding-bottom:110px}
-  .bar{position:fixed;top:0;left:0;right:0;height:6px;background:#2563EB}
+  html,body{margin:0;padding:0}
+  body{position:relative;width:210mm;height:297mm;margin:0 auto;overflow:hidden;background:#fff;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0A0A0A;font-size:13px;line-height:1.5}
+  .page{height:100%;display:flex;flex-direction:column;padding:18mm 15mm 12mm}
+  .mid{flex:1 0 auto;display:flex;flex-direction:column;justify-content:center;padding-bottom:80px}
+  .bar{position:absolute;top:0;left:0;right:0;height:6px;background:#2563EB;z-index:3}
   .stamp{position:absolute;top:54px;right:46px;transform:rotate(-11deg);border:3px solid;border-radius:8px;padding:3px 14px;font-weight:800;font-size:20px;letter-spacing:2px;opacity:.85}
   .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:34px}
   .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:22px;letter-spacing:-.02em}
@@ -212,10 +214,11 @@ export function invoiceHTML(inv: Invoice): string {
   .foot{margin-top:28px;border-top:1px solid rgba(10,10,10,.1);padding-top:12px;font-size:10.5px;color:#888;line-height:1.6}
   .legal{margin-top:24px;border-top:1px solid rgba(10,10,10,.08);padding-top:12px;text-align:center;font-size:9px;color:#aab0ba;line-height:1.55}
   @page{size:A4;margin:0}
-  @media print{body{width:210mm;min-height:297mm;max-width:none;padding:16mm 14mm 12mm;margin:0}}
+  @media print{html,body{width:210mm;height:297mm}}
 </style></head><body>
   <div class="bar"></div>
   ${stamp}
+  <div class="page">
   <div class="top">
     <div>
       ${logoHtml}
@@ -245,6 +248,7 @@ export function invoiceHTML(inv: Invoice): string {
   <div class="foot">${foot}</div>
   </div>
   <div class="legal">${esc(LEGAL_MENTIONS)}${banque}</div>
+  </div>
   <script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script>
 </body></html>`;
 }
