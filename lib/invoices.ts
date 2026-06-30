@@ -168,7 +168,10 @@ export function invoiceHTML(inv: Invoice): string {
 
   const bottom = isDevis
     ? `<div class="sign"><div class="siglab">Bon pour accord — date et signature du client :</div><div class="sigbox"></div></div>`
-    : (e.iban ? `<div class="pay">Règlement par virement — <b>IBAN</b> ${esc(e.iban)}${e.bic ? ` · <b>BIC</b> ${esc(e.bic)}` : ""}</div>` : "");
+    : "";
+
+  // IBAN / BIC affichés dans le footer (jamais codés en dur : viennent du bloc Émetteur).
+  const banque = `${e.iban ? ` · IBAN ${esc(e.iban)}` : ""}${e.bic ? ` · BIC ${esc(e.bic)}` : ""}`;
 
   const foot = isDevis
     ? `Devis valable ${inv.valid_until ? `jusqu'au ${dfr(inv.valid_until)}` : "30 jours"}. Une fois accepté, il fera l'objet d'une facture.${inv.notes ? `<br><br>${esc(inv.notes)}` : ""}`
@@ -238,7 +241,7 @@ export function invoiceHTML(inv: Invoice): string {
   ${bottom}
 
   <div class="foot">${foot}</div>
-  <div class="legal">${esc(LEGAL_MENTIONS)}</div>
+  <div class="legal">${esc(LEGAL_MENTIONS)}${banque}</div>
   <script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script>
 </body></html>`;
 }

@@ -128,17 +128,13 @@ export default function InvoicePreview({ inv }: { inv: Invoice }) {
         </p>
         {!inv.vat_enabled && <p className="mt-1.5 text-[9.5px] italic text-mut">TVA non applicable, art. 293 B du CGI.</p>}
 
-        {/* Paiement / signature */}
-        {isDevis ? (
+        {/* Signature (devis) — l'IBAN est désormais dans le footer */}
+        {isDevis && (
           <div className="mt-3">
             <p className="text-[9px] text-mut">Bon pour accord — date et signature du client :</p>
             <div className="mt-1 h-12 w-40 rounded-md border border-dashed border-line/70" />
           </div>
-        ) : e.iban ? (
-          <div className="mt-3 rounded-lg border border-[#DCE6FB] bg-[#F4F7FE] p-2.5 text-[10px]">
-            Règlement par virement — <b className="text-[#1E3A8A]">IBAN</b> {e.iban}{e.bic && <> · <b className="text-[#1E3A8A]">BIC</b> {e.bic}</>}
-          </div>
-        ) : null}
+        )}
 
         {/* Conditions */}
         <div className="mt-3 whitespace-pre-line border-t border-line pt-2 text-[8.5px] leading-relaxed text-mut">
@@ -148,8 +144,10 @@ export default function InvoicePreview({ inv }: { inv: Invoice }) {
           {inv.notes ? `\n\n${inv.notes}` : ""}
         </div>
 
-        {/* Mentions légales permanentes */}
-        <p className="mt-2.5 text-center text-[8px] leading-relaxed text-mut/80">{LEGAL_MENTIONS}</p>
+        {/* Mentions légales permanentes + coordonnées bancaires (IBAN/BIC saisis dans l'émetteur) */}
+        <p className="mt-2.5 text-center text-[8px] leading-relaxed text-mut/80">
+          {LEGAL_MENTIONS}{e.iban ? ` · IBAN ${e.iban}` : ""}{e.bic ? ` · BIC ${e.bic}` : ""}
+        </p>
       </div>
     </div>
   );
