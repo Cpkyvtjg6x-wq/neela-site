@@ -181,7 +181,7 @@ export function invoiceHTML(inv: Invoice): string {
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{position:relative;display:flex;flex-direction:column;min-height:100vh;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0A0A0A;padding:50px 48px 30px;max-width:820px;margin:auto;font-size:13px;line-height:1.5}
-  .mid{flex:1 0 auto;display:flex;flex-direction:column;justify-content:center;padding:28px 0}
+  .mid{flex:1 0 auto;display:flex;flex-direction:column;justify-content:center;padding-bottom:110px}
   .bar{position:fixed;top:0;left:0;right:0;height:6px;background:#2563EB}
   .stamp{position:absolute;top:54px;right:46px;transform:rotate(-11deg);border:3px solid;border-radius:8px;padding:3px 14px;font-weight:800;font-size:20px;letter-spacing:2px;opacity:.85}
   .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:34px}
@@ -211,7 +211,8 @@ export function invoiceHTML(inv: Invoice): string {
   .mention{margin-top:14px;font-size:12px;color:#444;font-style:italic}
   .foot{margin-top:28px;border-top:1px solid rgba(10,10,10,.1);padding-top:12px;font-size:10.5px;color:#888;line-height:1.6}
   .legal{margin-top:24px;border-top:1px solid rgba(10,10,10,.08);padding-top:12px;text-align:center;font-size:9px;color:#aab0ba;line-height:1.55}
-  @media print{body{padding:24px}}
+  @page{size:A4;margin:0}
+  @media print{body{width:210mm;min-height:297mm;max-width:none;padding:16mm 14mm 12mm;margin:0}}
 </style></head><body>
   <div class="bar"></div>
   ${stamp}
@@ -226,11 +227,11 @@ export function invoiceHTML(inv: Invoice): string {
     </div>
   </div>
 
-  <div class="mid">
   <div class="parties" style="justify-content:flex-end">
     <div style="width:50%"><div class="lab">${isDevis ? "Client" : "Facturé à"}</div><div class="nm">${esc(c.nom || "—")}</div><div class="em">${esc(c.adresse || "")}${c.siret ? `<br>SIRET ${esc(c.siret)}` : ""}${c.email ? `<br>${esc(c.email)}` : ""}</div></div>
   </div>
 
+  <div class="mid">
   <table>
     <thead><tr><td>Désignation</td><td class="r">Qté</td><td class="r">PU HT</td><td class="r">Montant HT</td></tr></thead>
     <tbody>${rows || `<tr><td colspan="4" style="color:#888">Aucune ligne</td></tr>`}</tbody>
