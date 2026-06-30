@@ -5,10 +5,9 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2, FileDown, Save, X } from "lucide-react";
 import { saveInvoice } from "@/app/crm/actions";
 import {
-  computeTotals, eur2, invoiceHTML, DEFAULT_TERMS,
+  computeTotals, eur2, invoiceHTML, montantEnLettres, DEFAULT_TERMS, LEGAL_MENTIONS,
   type Invoice, type InvoiceItem, type InvoiceEmitter, type InvoiceClient,
 } from "@/lib/invoices";
-import InvoicePreview from "./InvoicePreview";
 
 type Centre = { id: string; nom: string; ville: string | null; email: string | null; telephone: string | null };
 
@@ -30,6 +29,25 @@ const EMPTY_EMITTER: InvoiceEmitter = {
   bic: "",
 };
 const EMPTY_CLIENT: InvoiceClient = { nom: "", adresse: "", email: "", siret: "" };
+
+// --- Champs en ligne (le document EST le formulaire) ---
+const inlineBase =
+  "rounded bg-transparent px-1 -mx-1 outline-none transition-colors placeholder:text-mut/45 hover:bg-black/[0.04] focus:bg-accent/[0.08]";
+
+function Txt({ value, set, placeholder, className = "", list, auto }: { value: string; set: (v: string) => void; placeholder?: string; className?: string; list?: string; auto?: boolean }) {
+  // auto = largeur ajustée au contenu (champ « texte » en ligne qui ne tronque pas).
+  const style = auto ? { width: `${Math.max((value || placeholder || "").length, 3) + 1}ch` } : undefined;
+  return <input value={value} onChange={(e) => set(e.target.value)} placeholder={placeholder} list={list} style={style} className={`${inlineBase} ${className}`} />;
+}
+function Num({ value, set, className = "" }: { value: number; set: (n: number) => void; className?: string }) {
+  return <input type="number" value={value} onChange={(e) => set(Number(e.target.value))} className={`${inlineBase} [appearance:textfield] ${className}`} />;
+}
+function Area({ value, set, placeholder, rows = 1, className = "" }: { value: string; set: (v: string) => void; placeholder?: string; rows?: number; className?: string }) {
+  return <textarea value={value} onChange={(e) => set(e.target.value)} placeholder={placeholder} rows={rows} className={`${inlineBase} block w-full resize-none ${className}`} />;
+}
+function DateInp({ value, set, className = "" }: { value: string; set: (v: string) => void; className?: string }) {
+  return <input type="date" value={value} onChange={(e) => set(e.target.value)} className={`${inlineBase} ${className}`} />;
+}
 
 export default function InvoiceEditor({
   initial,
@@ -126,7 +144,6 @@ export default function InvoiceEditor({
   function saveAndExport() {
     setErr(null);
     if (!client.nom.trim()) { setErr("Le nom du client est obligatoire."); return; }
-    // On ouvre la fenêtre AVANT l'await (sinon le navigateur la bloque comme pop-up).
     const w = window.open("", "_blank", "width=860,height=1040");
     start(async () => {
       const res = await saveInvoice(payload());
@@ -137,194 +154,204 @@ export default function InvoiceEditor({
     });
   }
 
-  const field = "w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent";
-  const label = "text-xs font-semibold uppercase tracking-wide text-mut";
-  const card = "rounded-2xl border border-line bg-white p-5";
-
   const setItem = (i: number, patch: Partial<InvoiceItem>) =>
     setItems((arr) => arr.map((it, k) => (k === i ? { ...it, ...patch } : it)));
 
-  // Document reconstruit à chaque rendu → aperçu en direct.
-  const previewInv = buildInvoice(initial?.number ?? "", initial?.id ?? "");
+  const onClientName = (v: string) => {
+    const c = centres.find((x) => x.nom === v);
+    setClient((cl) => ({ ...cl, nom: v, email: cl.email || (c?.email ?? "") }));
+    if (c) setProspectId(c.id);
+  };
+
+  const isDevis = docType === "devis";
+  const title = isDevis ? "Devis" : "Facture";
+  const amountWords = !isDevis && deposit > 0 ? t.net : t.ttc;
+  const seg = (on: boolean) => `rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${on ? "bg-ink text-paper" : "text-mut hover:text-ink"}`;
+
+  const STAMP: Record<string, [string, string]> = {
+    brouillon: ["BROUILLON", "#94a3b8"], payee: ["PAYÉE", "#059669"], annulee: ["ANNULÉE", "#dc2626"],
+  };
+  const sm = STAMP[status];
 
   return (
     <div>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-bold tracking-tight">
-            {initial ? `${initial.doc_type === "devis" ? "Devis" : "Facture"} ${initial.number}` : (docType === "devis" ? "Nouveau devis" : "Nouvelle facture")}
-          </h1>
-          <p className="mt-1 text-sm text-mut">{initial ? "Modification" : "Le numéro est attribué automatiquement à l'enregistrement."}</p>
+      {/* Barre d'actions (pas de champs latéraux : on remplit le document) */}
+      <div className="sticky top-0 z-20 mb-4 flex flex-wrap items-center gap-2 border-b border-line bg-paper/90 py-3 backdrop-blur">
+        <h1 className="mr-1 font-display text-lg font-bold tracking-tight">
+          {initial ? `${initial.doc_type === "devis" ? "Devis" : "Facture"} ${initial.number}` : "Nouveau document"}
+        </h1>
+        {!initial && (
+          <div className="inline-flex rounded-full border border-line bg-white p-1">
+            <button onClick={() => setDocType("facture")} className={seg(!isDevis)}>Facture</button>
+            <button onClick={() => setDocType("devis")} className={seg(isDevis)}>Devis</button>
+          </div>
+        )}
+        <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold outline-none">
+          <option value="brouillon">Brouillon</option>
+          <option value="envoyee">Envoyée</option>
+          <option value="payee">Payée</option>
+          <option value="annulee">Annulée</option>
+        </select>
+        <label className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold">
+          <input type="checkbox" checked={vatEnabled} onChange={(e) => setVatEnabled(e.target.checked)} className="h-3.5 w-3.5 accent-accent" /> TVA
+          {vatEnabled && <><input type="number" value={vatRate} onChange={(e) => setVatRate(Number(e.target.value))} className="w-11 rounded bg-paper px-1 text-right outline-none" /> %</>}
+        </label>
+        <div className="ml-auto flex items-center gap-2">
+          <button onClick={onClose} className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-sm font-semibold text-mut hover:border-ink hover:text-ink"><X size={15} /> Fermer</button>
+          <button onClick={save} disabled={pending} className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-4 py-2 text-sm font-semibold text-paper hover:bg-accent disabled:opacity-60"><Save size={15} /> {pending ? "…" : "Enregistrer"}</button>
+          <button onClick={saveAndExport} disabled={pending} className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"><FileDown size={15} /> Exporter PDF</button>
         </div>
-        <button onClick={onClose} className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-sm font-semibold text-mut hover:border-ink hover:text-ink">
-          <X size={15} /> Fermer
-        </button>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(330px,400px)]">
-        {/* Colonne formulaire */}
-        <div className="min-w-0">
-          <div className="grid gap-5 lg:grid-cols-2">
-        {/* Émetteur */}
-        <details className={card} open={!initial}>
-          <summary className="cursor-pointer font-display text-base font-bold">Émetteur (toi)</summary>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2"><p className={label}>Raison sociale / nom</p><input value={emitter.nom} onChange={(e) => setEmitter({ ...emitter, nom: e.target.value })} className={field} /></div>
-            <div className="sm:col-span-2"><p className={label}>Adresse</p><input value={emitter.adresse} onChange={(e) => setEmitter({ ...emitter, adresse: e.target.value })} className={field} /></div>
-            <div><p className={label}>SIRET</p><input value={emitter.siret} onChange={(e) => setEmitter({ ...emitter, siret: e.target.value })} className={field} /></div>
-            {vatEnabled && <div><p className={label}>N° TVA intracom.</p><input value={emitter.tvaIntra} onChange={(e) => setEmitter({ ...emitter, tvaIntra: e.target.value })} className={field} /></div>}
-            <div><p className={label}>Email</p><input value={emitter.email} onChange={(e) => setEmitter({ ...emitter, email: e.target.value })} className={field} /></div>
-            <div><p className={label}>Téléphone</p><input value={emitter.tel} onChange={(e) => setEmitter({ ...emitter, tel: e.target.value })} className={field} /></div>
-            <div><p className={label}>IBAN</p><input value={emitter.iban} onChange={(e) => setEmitter({ ...emitter, iban: e.target.value })} className={field} /></div>
-            <div><p className={label}>BIC</p><input value={emitter.bic} onChange={(e) => setEmitter({ ...emitter, bic: e.target.value })} className={field} /></div>
-            <div className="sm:col-span-2"><p className={label}>Logo (URL ou chemin, ex. /logo-neela.png)</p><input value={emitter.logo ?? ""} onChange={(e) => setEmitter({ ...emitter, logo: e.target.value })} placeholder="Laisse vide pour la pastille ● Neela" className={field} /></div>
-          </div>
-          <p className="mt-2 text-[11px] text-mut">Tes coordonnées sont mémorisées dans ce navigateur pour les prochaines factures.</p>
-        </details>
+      {err && <p className="mb-3 text-sm font-medium text-red-600">{err}</p>}
+      <p className="mb-3 text-center text-xs text-mut">Remplissez le document directement — cliquez sur n'importe quel champ.</p>
 
-        {/* Client */}
-        <div className={card}>
-          <h2 className="mb-4 font-display text-base font-bold">Client</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <p className={label}>Depuis le CRM</p>
-              <select
-                value={prospectId ?? ""}
-                onChange={(e) => {
-                  const c = centres.find((x) => x.id === e.target.value);
-                  setProspectId(e.target.value || null);
-                  if (c) setClient({ ...client, nom: c.nom, email: c.email ?? client.email });
-                }}
-                className={field}
-              >
-                <option value="">— Saisie manuelle —</option>
-                {centres.map((c) => <option key={c.id} value={c.id}>{c.nom}{c.ville ? ` · ${c.ville}` : ""}</option>)}
-              </select>
-            </div>
-            <div className="sm:col-span-2"><p className={label}>Nom / raison sociale *</p><input value={client.nom} onChange={(e) => setClient({ ...client, nom: e.target.value })} className={field} /></div>
-            <div className="sm:col-span-2"><p className={label}>Adresse</p><input value={client.adresse} onChange={(e) => setClient({ ...client, adresse: e.target.value })} className={field} /></div>
-            <div><p className={label}>Email</p><input value={client.email} onChange={(e) => setClient({ ...client, email: e.target.value })} className={field} /></div>
-            <div><p className={label}>SIRET (si pro)</p><input value={client.siret} onChange={(e) => setClient({ ...client, siret: e.target.value })} className={field} /></div>
-          </div>
-        </div>
+      {/* DOCUMENT ÉDITABLE */}
+      <div className="relative mx-auto max-w-3xl overflow-hidden rounded-2xl border border-line bg-white text-ink shadow-float">
+        <div className="h-1.5 w-full bg-accent" />
+        {sm && (
+          <div className="pointer-events-none absolute left-1/2 top-[30%] z-10 -translate-x-1/2 -translate-y-1/2 -rotate-[15deg] rounded-md border-[3px] px-5 py-1.5 text-[28px] font-extrabold tracking-[0.15em] opacity-[0.16]"
+            style={{ color: sm[1], borderColor: sm[1] }}>{sm[0]}</div>
+        )}
 
-        {/* Dates & statut */}
-        <div className={card}>
-          <h2 className="mb-3 font-display text-base font-bold">Type & dates</h2>
-          {!initial && (
-            <div className="mb-4 inline-flex rounded-full border border-line bg-white p-1">
-              <button onClick={() => setDocType("facture")} className={`rounded-full px-4 py-1.5 text-sm font-semibold ${docType === "facture" ? "bg-ink text-paper" : "text-mut"}`}>Facture</button>
-              <button onClick={() => setDocType("devis")} className={`rounded-full px-4 py-1.5 text-sm font-semibold ${docType === "devis" ? "bg-ink text-paper" : "text-mut"}`}>Devis</button>
-            </div>
-          )}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div><p className={label}>Date d'émission</p><input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className={field} /></div>
-            {docType === "devis" ? (
-              <div><p className={label}>Validité jusqu'au</p><input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={field} /></div>
-            ) : (
-              <div><p className={label}>Échéance</p><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={field} /></div>
-            )}
-            {docType === "facture" && (
-              <div><p className={label}>Date de prestation</p><input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} className={field} /></div>
-            )}
-            <div>
-              <p className={label}>Statut</p>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} className={field}>
-                <option value="brouillon">Brouillon</option>
-                <option value="envoyee">Envoyée</option>
-                <option value="payee">Payée</option>
-                <option value="annulee">Annulée</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Options */}
-        <div className={card}>
-          <h2 className="mb-4 font-display text-base font-bold">Options</h2>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={vatEnabled} onChange={(e) => setVatEnabled(e.target.checked)} className="h-4 w-4 rounded border-line accent-accent" />
-            Assujetti à la TVA (sinon : franchise en base, art. 293 B)
-          </label>
-          {vatEnabled && (
-            <div className="mt-3"><p className={label}>Taux de TVA (%)</p><input type="number" value={vatRate} onChange={(e) => setVatRate(Number(e.target.value))} className={field} /></div>
-          )}
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <div>
-              <p className={label}>Remise</p>
-              <select value={discountType} onChange={(e) => setDiscountType(e.target.value as "none" | "percent" | "amount")} className={field}>
-                <option value="none">Aucune</option>
-                <option value="percent">En %</option>
-                <option value="amount">En €</option>
-              </select>
-            </div>
-            <div><p className={label}>Valeur remise</p><input type="number" value={discountValue} onChange={(e) => setDiscountValue(Number(e.target.value))} disabled={discountType === "none"} className={`${field} disabled:opacity-50`} /></div>
-          </div>
-          <div className="mt-3"><p className={label}>Acompte déjà versé (€)</p><input type="number" value={deposit} onChange={(e) => setDeposit(Number(e.target.value))} className={field} /></div>
-        </div>
-
-        {/* Lignes */}
-        <div className={`${card} lg:col-span-2`}>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-display text-base font-bold">Prestations</h2>
-            <button onClick={() => setItems([...items, { designation: "", qty: 1, unit: 0 }])} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-semibold hover:border-accent hover:text-accent">
-              <Plus size={14} /> Ligne
-            </button>
-          </div>
-          <div className="space-y-2">
-            {items.map((it, i) => (
-              <div key={i} className="grid grid-cols-[1fr_70px_110px_110px_32px] items-center gap-2">
-                <input value={it.designation} onChange={(e) => setItem(i, { designation: e.target.value })} placeholder="Désignation" className={field} />
-                <input type="number" value={it.qty} onChange={(e) => setItem(i, { qty: Number(e.target.value) })} className={`${field} text-right`} />
-                <input type="number" value={it.unit} onChange={(e) => setItem(i, { unit: Number(e.target.value) })} placeholder="PU HT" className={`${field} text-right`} />
-                <span className="text-right text-sm font-semibold tabular-nums">{eur2((Number(it.qty) || 0) * (Number(it.unit) || 0))}</span>
-                <button onClick={() => setItems(items.filter((_, k) => k !== i))} className="text-mut hover:text-red-600" aria-label="Supprimer la ligne"><Trash2 size={15} /></button>
+        <div className="p-7 text-[13px] leading-relaxed sm:p-9">
+          {/* En-tête */}
+          <div className="mb-7 flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 font-display text-2xl font-bold tracking-tight">
+                <span className="h-3 w-3 shrink-0 rounded-full bg-accent" />
+                <Txt value={emitter.nom} set={(v) => setEmitter({ ...emitter, nom: v })} placeholder="Neela" className="min-w-0 flex-1 font-display text-2xl font-bold" />
               </div>
+              <div className="mt-2 max-w-xs text-[11px] text-mut">
+                <Area value={emitter.adresse} set={(v) => setEmitter({ ...emitter, adresse: v })} placeholder="Adresse" className="text-[11px]" />
+                <div>SIRET <Txt value={emitter.siret} set={(v) => setEmitter({ ...emitter, siret: v })} placeholder="—" auto className="text-[11px]" /></div>
+                <div className="flex flex-wrap items-center">
+                  <Txt value={emitter.email} set={(v) => setEmitter({ ...emitter, email: v })} placeholder="email" auto className="text-[11px]" /><span className="px-1">·</span>
+                  <Txt value={emitter.tel} set={(v) => setEmitter({ ...emitter, tel: v })} placeholder="tél" auto className="text-[11px]" />
+                </div>
+              </div>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="font-display text-2xl font-bold">{title}</p>
+              <div className="mt-1.5 space-y-0.5 text-[11px] text-mut">
+                <div>N° <b className="text-ink">{initial?.number ?? "(attribué à l'enregistrement)"}</b></div>
+                <div>{isDevis ? "Émis le" : "Émise le"} <DateInp value={issueDate} set={setIssueDate} className="text-[11px]" /></div>
+                {isDevis
+                  ? <div>Valable jusqu'au <DateInp value={validUntil} set={setValidUntil} className="text-[11px]" /></div>
+                  : <>
+                      <div>Échéance <DateInp value={dueDate} set={setDueDate} className="text-[11px]" /></div>
+                      <div>Prestation <DateInp value={saleDate} set={setSaleDate} className="text-[11px]" /></div>
+                    </>}
+              </div>
+            </div>
+          </div>
+
+          {/* Parties */}
+          <div className="mb-6 grid grid-cols-2 gap-3">
+            <div className="rounded-lg border border-line p-3">
+              <p className="mb-1 text-[9px] uppercase tracking-[0.12em] text-mut">Émetteur</p>
+              <p className="text-[13px] font-bold">{emitter.nom || "Neela"}</p>
+              <p className="whitespace-pre-line text-[11px] leading-snug text-mut">{emitter.adresse}{emitter.siret ? `\nSIRET ${emitter.siret}` : ""}</p>
+            </div>
+            <div className="rounded-lg border border-line p-3">
+              <p className="mb-1 text-[9px] uppercase tracking-[0.12em] text-mut">Client</p>
+              <Txt value={client.nom} set={onClientName} list="crm-centres" placeholder="Nom / raison sociale *" className="block w-full text-[13px] font-bold" />
+              <Area value={client.adresse} set={(v) => setClient({ ...client, adresse: v })} placeholder="Adresse" className="text-[11px] text-mut" />
+              <div className="text-[11px] text-mut">SIRET <Txt value={client.siret} set={(v) => setClient({ ...client, siret: v })} placeholder="—" auto className="text-[11px]" /></div>
+              <Txt value={client.email} set={(v) => setClient({ ...client, email: v })} placeholder="email" className="block w-full text-[11px] text-mut" />
+              <datalist id="crm-centres">{centres.map((c) => <option key={c.id} value={c.nom} />)}</datalist>
+            </div>
+          </div>
+
+          {/* Prestations */}
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b-2 border-ink text-[9px] uppercase tracking-wide text-mut">
+                <td className="py-2 pr-2">Désignation</td>
+                <td className="w-14 py-2 text-right">Qté</td>
+                <td className="w-24 py-2 text-right">PU&nbsp;HT</td>
+                <td className="w-28 py-2 text-right">Montant</td>
+                <td className="w-6" />
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it, i) => (
+                <tr key={i} className="group border-b border-line/70">
+                  <td className="py-1.5 pr-2"><Txt value={it.designation} set={(v) => setItem(i, { designation: v })} placeholder="Désignation…" className="block w-full" /></td>
+                  <td className="py-1.5 text-right"><Num value={it.qty} set={(v) => setItem(i, { qty: v })} className="w-12 text-right tabular-nums" /></td>
+                  <td className="py-1.5 text-right"><Num value={it.unit} set={(v) => setItem(i, { unit: v })} className="w-20 text-right tabular-nums" /></td>
+                  <td className="py-1.5 text-right font-medium tabular-nums">{eur2((Number(it.qty) || 0) * (Number(it.unit) || 0))}</td>
+                  <td className="text-right">
+                    <button onClick={() => setItems(items.filter((_, k) => k !== i))} aria-label="Supprimer la ligne" className="text-mut opacity-0 transition group-hover:opacity-100 hover:text-red-600"><Trash2 size={14} /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button onClick={() => setItems([...items, { designation: "", qty: 1, unit: 0 }])} className="mt-2 inline-flex items-center gap-1 text-[12px] font-semibold text-accent hover:underline"><Plus size={13} /> Ajouter une ligne</button>
+
+          {/* Totaux (remise / acompte en ligne, TVA dans la barre du haut) */}
+          <div className="ml-auto mt-5 w-full max-w-[320px] space-y-1.5 text-[13px]">
+            {discountType === "none" ? (
+              <div className="text-right"><button onClick={() => { setDiscountType("percent"); setDiscountValue(10); }} className="text-[11px] font-semibold text-accent hover:underline">+ Remise</button></div>
+            ) : (
+              <div className="flex items-center justify-between text-mut">
+                <span className="inline-flex items-center gap-1">
+                  Remise
+                  <select value={discountType} onChange={(e) => setDiscountType(e.target.value as "percent" | "amount")} className="rounded bg-paper px-0.5 text-[11px] outline-none"><option value="percent">%</option><option value="amount">€</option></select>
+                  <Num value={discountValue} set={setDiscountValue} className="w-12 text-right" />
+                  <button onClick={() => { setDiscountType("none"); setDiscountValue(0); }} className="text-mut hover:text-red-600"><X size={12} /></button>
+                </span>
+                <span>− {eur2(t.disc)}</span>
+              </div>
+            )}
+            {vatEnabled ? (
+              <>
+                <div className="flex justify-between"><span className="text-mut">Total HT</span><span className="font-medium tabular-nums">{eur2(t.ht)}</span></div>
+                <div className="flex justify-between"><span className="text-mut">TVA {vatRate}&nbsp;%</span><span className="font-medium tabular-nums">{eur2(t.tva)}</span></div>
+                <div className="flex justify-between border-t-2 border-ink pt-1.5 font-display text-base font-bold"><span>Total TTC</span><span className="tabular-nums">{eur2(t.ttc)}</span></div>
+              </>
+            ) : (
+              <div className="flex justify-between border-t-2 border-ink pt-1.5 font-display text-base font-bold"><span>Total</span><span className="tabular-nums">{eur2(t.ttc)}</span></div>
+            )}
+            {!isDevis && (deposit > 0 ? (
+              <>
+                <div className="flex items-center justify-between text-mut">
+                  <span className="inline-flex items-center gap-1">Acompte versé <Num value={deposit} set={setDeposit} className="w-16 text-right" /><button onClick={() => setDeposit(0)} className="hover:text-red-600"><X size={12} /></button></span>
+                  <span>− {eur2(deposit)}</span>
+                </div>
+                <div className="flex justify-between border-t border-line pt-1 font-bold"><span>Net à payer</span><span className="text-accent tabular-nums">{eur2(t.net)}</span></div>
+              </>
+            ) : (
+              <div className="text-right"><button onClick={() => setDeposit(100)} className="text-[11px] font-semibold text-accent hover:underline">+ Acompte</button></div>
             ))}
           </div>
 
-          <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <div>
-              <p className={label}>Conditions / mentions de paiement</p>
-              <textarea value={terms} onChange={(e) => setTerms(e.target.value)} rows={4} className={field} />
-              <p className={`${label} mt-3`}>Note (optionnel)</p>
-              <input value={notes} onChange={(e) => setNotes(e.target.value)} className={field} />
+          <p className="mt-3 text-right text-[11px] italic text-mut">Arrêté{isDevis ? "" : "e"} à la somme de {montantEnLettres(amountWords)}.</p>
+          {!vatEnabled && <p className="mt-1.5 text-[11px] italic text-mut">TVA non applicable, art. 293 B du CGI.</p>}
+
+          {isDevis && (
+            <div className="mt-5">
+              <p className="text-[11px] text-mut">Bon pour accord — date et signature du client :</p>
+              <div className="mt-1.5 h-16 w-52 rounded-md border border-dashed border-line/70" />
             </div>
-            <div className="rounded-2xl bg-paper p-4">
-              <div className="space-y-1.5 text-sm">
-                {t.disc > 0 && <div className="flex justify-between text-mut"><span>Sous-total</span><span>{eur2(t.sub)}</span></div>}
-                {t.disc > 0 && <div className="flex justify-between text-mut"><span>Remise</span><span>− {eur2(t.disc)}</span></div>}
-                <div className="flex justify-between"><span className="text-mut">Total HT</span><span className="font-semibold">{eur2(t.ht)}</span></div>
-                {vatEnabled && <div className="flex justify-between"><span className="text-mut">TVA {vatRate} %</span><span className="font-semibold">{eur2(t.tva)}</span></div>}
-                <div className="flex justify-between border-t border-line pt-2 font-display text-lg font-bold"><span>Total {vatEnabled ? "TTC" : ""}</span><span className="text-accent">{eur2(t.ttc)}</span></div>
-                {deposit > 0 && <div className="flex justify-between border-t border-line pt-2 text-sm"><span className="text-mut">Net à payer</span><span className="font-bold">{eur2(t.net)}</span></div>}
-              </div>
-              {!vatEnabled && <p className="mt-3 text-[11px] italic text-mut">TVA non applicable, art. 293 B du CGI.</p>}
+          )}
+
+          {/* Conditions / note (éditables) */}
+          <div className="mt-6 border-t border-line pt-3">
+            <Area value={terms} set={setTerms} rows={3} placeholder="Conditions / mentions de paiement…" className="text-[11px] leading-relaxed text-mut" />
+            <Txt value={notes} set={setNotes} placeholder="Note (optionnel)…" className="mt-1 block w-full text-[11px] text-mut" />
+          </div>
+
+          {/* Mentions légales permanentes + IBAN/BIC (éditables, jamais codés en dur) */}
+          <div className="mt-5 border-t border-line pt-3 text-center text-[10px] leading-relaxed text-mut/80">
+            <p>{LEGAL_MENTIONS}</p>
+            <div className="mt-0.5 inline-flex flex-wrap items-center justify-center gap-x-0.5">
+              <span>· IBAN</span><Txt value={emitter.iban} set={(v) => setEmitter({ ...emitter, iban: v })} placeholder="FR.." auto className="text-center text-[10px]" />
+              <span>· BIC</span><Txt value={emitter.bic} set={(v) => setEmitter({ ...emitter, bic: v })} placeholder="—" auto className="text-[10px]" />
             </div>
           </div>
         </div>
-          </div>
-
-          {err && <p className="mt-4 text-sm font-medium text-red-600">{err}</p>}
-
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button onClick={() => save()} disabled={pending} className="inline-flex items-center gap-2 rounded-xl bg-ink px-5 py-2.5 text-sm font-semibold text-paper hover:bg-accent disabled:opacity-60">
-              <Save size={16} /> {pending ? "Enregistrement…" : "Enregistrer"}
-            </button>
-            <button onClick={saveAndExport} disabled={pending} className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
-              <FileDown size={16} /> Enregistrer & exporter PDF
-            </button>
-          </div>
-        </div>
-
-        {/* Colonne aperçu en direct */}
-        <aside className="min-w-0">
-          <div className="xl:sticky xl:top-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-mut">Aperçu en direct</p>
-            <InvoicePreview inv={previewInv} />
-            <p className="mt-2 text-[11px] text-mut">Mis à jour à chaque saisie. Le PDF final est généré à l'export.</p>
-          </div>
-        </aside>
       </div>
     </div>
   );
