@@ -52,6 +52,10 @@ export const STATUTS_FACTURE: { key: string; label: string; color: string }[] = 
 export const DEFAULT_TERMS =
   "Paiement à 30 jours à réception de facture. En cas de retard : pénalités au taux de 3 fois l'intérêt légal et indemnité forfaitaire de recouvrement de 40 € (art. L441-10 et D441-5 du code de commerce). Pas d'escompte pour paiement anticipé.";
 
+// Mentions légales permanentes affichées en bas de CHAQUE document (entité émettrice).
+export const LEGAL_MENTIONS =
+  "Jean-Amin Morfin — Entreprise individuelle · SIRET 943 171 157 00028 · 290 Chemin de Pierres Onches, 30140 Anduze · 07 83 64 09 05 · morfin@neelaagency.com · neelaagency.com";
+
 export function computeTotals(inv: {
   items: InvoiceItem[];
   discount_type: "none" | "percent" | "amount";
@@ -75,8 +79,9 @@ export function computeTotals(inv: {
 export const eur2 = (n: number) =>
   (Number.isFinite(n) ? n : 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 
-const dfr = (d: string | null) =>
+export const fmtDateFr = (d: string | null) =>
   d ? new Date(d + "T12:00:00Z").toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" }) : "—";
+const dfr = fmtDateFr;
 
 const esc = (s: string) =>
   String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -201,6 +206,7 @@ export function invoiceHTML(inv: Invoice): string {
   .sign .sigbox{width:280px;height:92px;border:1px dashed rgba(10,10,10,.28);border-radius:10px}
   .mention{margin-top:14px;font-size:12px;color:#444;font-style:italic}
   .foot{margin-top:28px;border-top:1px solid rgba(10,10,10,.1);padding-top:12px;font-size:10.5px;color:#888;line-height:1.6}
+  .legal{margin-top:12px;text-align:center;font-size:9px;color:#aab0ba;line-height:1.55}
   @media print{body{padding:24px}}
 </style></head><body>
   <div class="bar"></div>
@@ -232,6 +238,7 @@ export function invoiceHTML(inv: Invoice): string {
   ${bottom}
 
   <div class="foot">${foot}</div>
+  <div class="legal">${esc(LEGAL_MENTIONS)}</div>
   <script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script>
 </body></html>`;
 }

@@ -8,6 +8,7 @@ import {
   computeTotals, eur2, invoiceHTML, DEFAULT_TERMS,
   type Invoice, type InvoiceItem, type InvoiceEmitter, type InvoiceClient,
 } from "@/lib/invoices";
+import InvoicePreview from "./InvoicePreview";
 
 type Centre = { id: string; nom: string; ville: string | null; email: string | null; telephone: string | null };
 
@@ -18,7 +19,16 @@ const addDaysISO = (iso: string, n: number) => {
   return d.toISOString().slice(0, 10);
 };
 
-const EMPTY_EMITTER: InvoiceEmitter = { nom: "Neela", adresse: "", siret: "", tvaIntra: "", email: "", tel: "", iban: "", bic: "" };
+const EMPTY_EMITTER: InvoiceEmitter = {
+  nom: "Neela",
+  adresse: "290 Chemin de Pierres Onches, 30140 Anduze",
+  siret: "943 171 157 00028",
+  tvaIntra: "",
+  email: "morfin@neelaagency.com",
+  tel: "07 83 64 09 05",
+  iban: "",
+  bic: "",
+};
 const EMPTY_CLIENT: InvoiceClient = { nom: "", adresse: "", email: "", siret: "" };
 
 export default function InvoiceEditor({
@@ -134,6 +144,9 @@ export default function InvoiceEditor({
   const setItem = (i: number, patch: Partial<InvoiceItem>) =>
     setItems((arr) => arr.map((it, k) => (k === i ? { ...it, ...patch } : it)));
 
+  // Document reconstruit à chaque rendu → aperçu en direct.
+  const previewInv = buildInvoice(initial?.number ?? "", initial?.id ?? "");
+
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -148,7 +161,10 @@ export default function InvoiceEditor({
         </button>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(330px,400px)]">
+        {/* Colonne formulaire */}
+        <div className="min-w-0">
+          <div className="grid gap-5 lg:grid-cols-2">
         {/* Émetteur */}
         <details className={card} open={!initial}>
           <summary className="cursor-pointer font-display text-base font-bold">Émetteur (toi)</summary>
@@ -287,17 +303,28 @@ export default function InvoiceEditor({
             </div>
           </div>
         </div>
-      </div>
+          </div>
 
-      {err && <p className="mt-4 text-sm font-medium text-red-600">{err}</p>}
+          {err && <p className="mt-4 text-sm font-medium text-red-600">{err}</p>}
 
-      <div className="mt-5 flex flex-wrap gap-3">
-        <button onClick={() => save()} disabled={pending} className="inline-flex items-center gap-2 rounded-xl bg-ink px-5 py-2.5 text-sm font-semibold text-paper hover:bg-accent disabled:opacity-60">
-          <Save size={16} /> {pending ? "Enregistrement…" : "Enregistrer"}
-        </button>
-        <button onClick={saveAndExport} disabled={pending} className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
-          <FileDown size={16} /> Enregistrer & exporter PDF
-        </button>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button onClick={() => save()} disabled={pending} className="inline-flex items-center gap-2 rounded-xl bg-ink px-5 py-2.5 text-sm font-semibold text-paper hover:bg-accent disabled:opacity-60">
+              <Save size={16} /> {pending ? "Enregistrement…" : "Enregistrer"}
+            </button>
+            <button onClick={saveAndExport} disabled={pending} className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
+              <FileDown size={16} /> Enregistrer & exporter PDF
+            </button>
+          </div>
+        </div>
+
+        {/* Colonne aperçu en direct */}
+        <aside className="min-w-0">
+          <div className="xl:sticky xl:top-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-mut">Aperçu en direct</p>
+            <InvoicePreview inv={previewInv} />
+            <p className="mt-2 text-[11px] text-mut">Mis à jour à chaque saisie. Le PDF final est généré à l'export.</p>
+          </div>
+        </aside>
       </div>
     </div>
   );
