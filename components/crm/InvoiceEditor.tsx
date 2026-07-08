@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2, FileDown, Save, X } from "lucide-react";
 import { saveInvoice } from "@/app/crm/actions";
 import {
-  computeTotals, eur2, invoiceHTML, montantEnLettres, DEFAULT_TERMS, LEGAL_MENTIONS,
+  computeTotals, eur2, montantEnLettres, DEFAULT_TERMS, LEGAL_MENTIONS,
   type Invoice, type InvoiceItem, type InvoiceEmitter, type InvoiceClient,
 } from "@/lib/invoices";
 
@@ -123,13 +123,6 @@ export default function InvoiceEditor({
     };
   }
 
-  function openPrint(html: string) {
-    const w = window.open("", "_blank", "width=860,height=1040");
-    if (!w) { alert("Autorise les fenêtres pop-up pour exporter la facture."); return; }
-    w.document.write(html);
-    w.document.close();
-  }
-
   function save() {
     setErr(null);
     if (!client.nom.trim()) { setErr("Le nom du client est obligatoire."); return; }
@@ -141,16 +134,22 @@ export default function InvoiceEditor({
     });
   }
 
+  // Enregistre puis télécharge un VRAI fichier PDF (.pdf) — s'ouvre dans Aperçu (Mac)
+  // / le lecteur PDF par défaut (Windows).
   function saveAndExport() {
     setErr(null);
     if (!client.nom.trim()) { setErr("Le nom du client est obligatoire."); return; }
-    const w = window.open("", "_blank", "width=860,height=1040");
     start(async () => {
       const res = await saveInvoice(payload());
-      if (!res.ok) { setErr(res.error || "Erreur lors de l'enregistrement."); w?.close(); return; }
+      if (!res.ok) { setErr(res.error || "Erreur lors de l'enregistrement."); return; }
       router.refresh();
-      const html = invoiceHTML(buildInvoice(res.number || initial?.number || "—", res.id || initial?.id || ""));
-      if (w) { w.document.write(html); w.document.close(); } else { openPrint(html); }
+      const finalInv = buildInvoice(res.number || initial?.number || "—", res.id || initial?.id || "");
+      try {
+        const { downloadInvoicePdf } = await import("@/lib/invoicePdf");
+        await downloadInvoicePdf(finalInv);
+      } catch (e) {
+        setErr("Échec de la génération du PDF : " + (e as Error).message);
+      }
     });
   }
 

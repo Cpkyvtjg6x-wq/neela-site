@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { Plus, FileDown, Pencil, Trash2, Copy, ArrowRightCircle, User } from "lucide-react";
-import { invoiceHTML, eur2, STATUTS_FACTURE, type Invoice, type InvoiceItem } from "@/lib/invoices";
+import { eur2, STATUTS_FACTURE, type Invoice, type InvoiceItem } from "@/lib/invoices";
 import { setInvoiceStatus, deleteInvoice, duplicateInvoiceNextMonth, convertDevisToInvoice } from "@/app/crm/actions";
 import InvoiceEditor from "./InvoiceEditor";
 
@@ -12,11 +12,14 @@ type Centre = { id: string; nom: string; ville: string | null; email: string | n
 const statutMeta = (k: string) => STATUTS_FACTURE.find((s) => s.key === k) ?? STATUTS_FACTURE[0];
 const fmtDate = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
 
-function openPrint(html: string) {
-  const w = window.open("", "_blank", "width=860,height=1040");
-  if (!w) { alert("Autorise les fenêtres pop-up pour exporter la facture."); return; }
-  w.document.write(html);
-  w.document.close();
+// Télécharge un vrai fichier PDF (import dynamique de la lib pour alléger le bundle).
+async function exportPdf(inv: Invoice) {
+  try {
+    const { downloadInvoicePdf } = await import("@/lib/invoicePdf");
+    await downloadInvoicePdf(inv);
+  } catch (e) {
+    alert("Échec de la génération du PDF : " + (e as Error).message);
+  }
 }
 
 export type Prefill = { prospectId?: string; nom: string; email?: string | null; docType?: "facture" | "devis"; items?: InvoiceItem[] };
@@ -123,7 +126,7 @@ export default function FacturesApp({
                     )}
                     <button onClick={() => start(async () => { await duplicateInvoiceNextMonth(inv.id); })} disabled={pending} title="Dupliquer pour le mois suivant" className="rounded-md border border-line p-1.5 text-mut hover:text-ink"><Copy size={14} /></button>
                     <button onClick={() => { setPrefill(undefined); setEditing(inv); }} title="Modifier" className="rounded-md border border-line p-1.5 text-mut hover:text-ink"><Pencil size={14} /></button>
-                    <button onClick={() => openPrint(invoiceHTML(inv))} title="Exporter PDF" className="rounded-md border border-line p-1.5 text-accent hover:bg-accent/10"><FileDown size={14} /></button>
+                    <button onClick={() => exportPdf(inv)} title="Exporter en PDF" className="rounded-md border border-line p-1.5 text-accent hover:bg-accent/10"><FileDown size={14} /></button>
                     <button
                       onClick={() => { if (confirm(`Supprimer ${inv.number} ?`)) start(async () => { await deleteInvoice(inv.id); }); }}
                       title="Supprimer" className="rounded-md border border-line p-1.5 text-red-600 hover:bg-red-50"><Trash2 size={14} /></button>
