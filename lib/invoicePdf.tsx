@@ -34,7 +34,7 @@ const s = StyleSheet.create({
   cPu: { width: 72, textAlign: "right" },
   cMt: { width: 80, textAlign: "right" },
   cMtB: { width: 80, textAlign: "right", fontFamily: "Helvetica-Bold" },
-  totals: { marginLeft: "auto", width: 215, marginTop: 14 },
+  totals: { marginLeft: "auto", width: 215, marginTop: 28 },
   totRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 },
   totTot: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1.5, borderTopColor: C.ink, paddingTop: 6, marginTop: 2 },
   totTotLab: { fontSize: 11, fontFamily: "Helvetica-Bold" },
