@@ -523,11 +523,15 @@ export async function saveInvoice(
   }
 
   // Numérotation séquentielle par année ET type (devis : D2026-001, facture : 2026-001).
+  // Plancher de reprise pour les FACTURES : la numérotation démarre au minimum à ce numéro
+  // pour l'année (reprise d'une séquence déjà entamée hors CRM). Sans effet une fois dépassé.
+  const FACTURE_SEQ_FLOOR: Record<number, number> = { 2026: 30 };
   const docType = base.doc_type;
   const year = new Date((input.issue_date || new Date().toISOString().slice(0, 10)) + "T12:00:00Z").getUTCFullYear();
   const { data: last } = await db
     .from("neela_invoices").select("seq").eq("year", year).eq("doc_type", docType).order("seq", { ascending: false }).limit(1);
-  const seq = ((last?.[0]?.seq as number) ?? 0) + 1;
+  const floor = docType === "facture" ? (FACTURE_SEQ_FLOOR[year] ?? 1) : 1;
+  const seq = Math.max(((last?.[0]?.seq as number) ?? 0) + 1, floor);
   const number = `${docType === "devis" ? "D" : ""}${year}-${String(seq).padStart(3, "0")}`;
 
   const { data, error } = await db
